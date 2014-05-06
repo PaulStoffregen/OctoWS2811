@@ -115,7 +115,10 @@ void OctoWS2811::begin(void)
 	SIM_SCGC7 |= SIM_SCGC7_DMA;
 	SIM_SCGC6 |= SIM_SCGC6_DMAMUX;
 	DMA_CR = 0;
-	DMA_ERQ = 0;
+	DMA_CERQ = 1;
+	DMA_CERQ = 2;
+	DMA_CERQ = 3;
+	
 
 	// DMA channel #1 sets WS2811 high at the beginning of each cycle
 	DMA_TCD1_SADDR = &ones;
@@ -229,7 +232,9 @@ void OctoWS2811::show(void)
 	PORTB_ISFR = (1<<0);    // clear any prior rising edge
 	PORTC_ISFR = (1<<0);	// clear any prior low duty falling edge
 	PORTA_ISFR = (1<<13);	// clear any prior high duty falling edge
-	DMA_ERQ = 0x0E;		// enable all 3 DMA channels
+	DMA_SERQ = 1;		// enable all 3 DMA channels
+	DMA_SERQ = 2;
+	DMA_SERQ = 3;
 	FTM1_SC = sc;		// restart FTM1 timer
 	//digitalWriteFast(1, LOW);
 	interrupts();
