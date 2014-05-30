@@ -9,7 +9,7 @@
 //OctoWS2811 Defn. Stuff
 #define COLS_LEDs 60  // all of the following params need to be adjusted for screen size
 #define ROWS_LEDs 16  // LED_LAYOUT assumed 0 if ROWS_LEDs > 8
-#define LEDS_PER_STRIP (COLS_LEDs * (ROWS_LEDs / 6))
+#define LEDS_PER_STRIP (COLS_LEDs * (ROWS_LEDs / 8))
 
 DMAMEM int displayMemory[LEDS_PER_STRIP*6];
 int drawingMemory[LEDS_PER_STRIP*6];
