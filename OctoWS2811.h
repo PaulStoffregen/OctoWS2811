@@ -23,6 +23,14 @@
 
 
 #include <Arduino.h>
+#include "DMAChannel.h"
+
+#if TEENSYDUINO < 120
+#error "Teensyduino version 1.20 or later is required to compile this library."
+#endif
+#ifdef __AVR__
+#error "The Audio Library only works with Teensy 3.X.  Teensy 2.0 is unsupported."
+#endif
 
 #define WS2811_RGB	0	// The WS2811 datasheet documents this way
 #define WS2811_RBG	1
@@ -60,5 +68,7 @@ private:
 	static void *frameBuffer;
 	static void *drawBuffer;
 	static uint8_t params;
+	static DMAChannel dma1, dma2, dma3;
+	static void isr(void);
 };
 
