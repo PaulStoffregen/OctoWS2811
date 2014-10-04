@@ -20,6 +20,16 @@
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
     THE SOFTWARE.
 
+
+  The recommended hardware for SD card playing is:
+
+    Teensy 3.1:     http://www.pjrc.com/store/teensy31.html
+    Octo28 Apaptor: http://www.pjrc.com/store/octo28_adaptor.html
+    SD Adaptor:     http://www.pjrc.com/store/wiz820_sd_adaptor.html
+    Long Pins:      http://www.digikey.com/product-search/en?keywords=S1082E-36-ND
+
+  See the included "hardware.jpg" image for suggested pin connections,
+  with 2 cuts and 1 solder bridge needed for the SD card pin 3 chip select.
  
   Required Connections
   --------------------
