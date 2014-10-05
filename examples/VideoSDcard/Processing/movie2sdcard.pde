@@ -45,14 +45,16 @@ boolean ledLayout = true;    // layout of rows, true = even is left->right
 
 double framerate = 23.98;    // You MUST set this to the movie's frame rate
                              // Processing does not seem to have a way to detect it.
+
 Movie myMovie = new Movie(this, "/Users/paul/myvideo.mov");
-FileOutputStream myFile;
+FileOutputStream myFile;     // edit output filename below...
 
 float gamma = 1.8;
 PImage ledImage;
 int[] gammatable = new int[256];
-double elapsed_time=0.0;
-int elapsed_usec=0;
+long elapsed_picoseconds=0L;
+long elapsed_microseconds=0L;
+long picoseconds_per_frame = (long)(1e12 / framerate + 0.5);
 boolean fileopen=true;
 
 void setup() {
@@ -74,9 +76,9 @@ void movieEvent(Movie m) {
   // read the movie's next frame
   m.read();
 
-  elapsed_time += 1000000.0 / framerate;
-  int usec = (int)(elapsed_time - elapsed_usec);
-  elapsed_usec += usec;
+  elapsed_picoseconds += picoseconds_per_frame;
+  int usec = (int)((elapsed_picoseconds / 1000000L) - elapsed_microseconds);
+  elapsed_microseconds += (long)usec;
   println("usec = " + usec);
   
   
