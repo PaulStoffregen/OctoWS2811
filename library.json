@@ -5,6 +5,7 @@
 "keywords": "serial",
 "description": "Control thousands of WS2811/2812 LEDs at video refresh speeds",
 "url": "http://www.pjrc.com/teensy/td_libs_OctoWS2811.html",
+"downloadUrl": "http://www.pjrc.com/teensy/arduino_libraries/OctoWS2811.zip",
 "authors":
 {
         "name": "Paul Stoffregen",
