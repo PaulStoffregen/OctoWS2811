@@ -45,7 +45,8 @@
 
 class OctoWS2811 {
 public:
-	OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB);
+	OctoWS2811();
+	void attach(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB);
 	void begin(void);
 
 	void setPixel(uint32_t num, int color);

@@ -37,8 +37,12 @@ static const uint8_t ones = 0xFF;
 static volatile uint8_t update_in_progress = 0;
 static uint32_t update_completed_at = 0;
 
+OctoWS2811::OctoWS2811()
+{
+    // Unusable
+}
 
-OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config)
+void OctoWS2811::attach(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config)
 {
 	stripLen = numPerStrip;
 	frameBuffer = frameBuf;
