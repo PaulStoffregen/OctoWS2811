@@ -27,51 +27,81 @@
 #include <Arduino.h>
 #include "DMAChannel.h"
 
-#if TEENSYDUINO < 120
-#error "Teensyduino version 1.20 or later is required to compile this library."
+#if TEENSYDUINO < 121
+#error "Teensyduino version 1.21 or later is required to compile this library."
 #endif
 #ifdef __AVR__
-#error "The Audio Library only works with Teensy 3.X.  Teensy 2.0 is unsupported."
+#error "OctoWS2811 does not work with Teensy 2.0 or Teensy++ 2.0."
 #endif
 
-#define WS2811_RGB	0	// The WS2811 datasheet documents this way
-#define WS2811_RBG	1
-#define WS2811_GRB	2	// Most LED strips are wired this way
-#define WS2811_GBR	3
+#define CONVERT_AT_SHOW
 
-#define WS2811_800kHz 0x00	// Nearly all WS2811 are 800 kHz
-#define WS2811_400kHz 0x10	// Adafruit's Flora Pixels
+#define WS2811_RGB    0    // The WS2811 datasheet documents this way
+#define WS2811_RBG    1
+#define WS2811_GRB    2    // Most LED strips are wired this way
+#define WS2811_GBR    3
+
+#define WS2811_800kHz 0x00    // Nearly all WS2811 are 800 kHz
+#define WS2811_400kHz 0x10    // Adafruit's Flora Pixels
 
 
 class OctoWS2811 {
 public:
-	OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB);
-	void begin(void);
+    OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB);
+    void begin(void);
 
-	void setPixel(uint32_t num, int color);
-	void setPixel(uint32_t num, uint8_t red, uint8_t green, uint8_t blue) {
-		setPixel(num, color(red, green, blue));
-	}
-	int getPixel(uint32_t num);
+    void setPixel(uint32_t strip, uint32_t offset, int color);
+#ifdef CONVERT_AT_SHOW
+    void setPixel(uint32_t strip, uint32_t offset, uint8_t red, uint8_t green, uint8_t blue);
+#else
+    void setPixel(uint32_t strip, uint32_t offset, uint8_t red, uint8_t green, uint8_t blue) {
+        setPixel(strip, offset, color(red, green, blue));
+    }
+#endif
+    void setPixel(uint32_t num, int color) {
+        setPixel(num / stripLen, num % stripLen, color);
+    }
+    void setPixel(uint32_t num, uint8_t red, uint8_t green, uint8_t blue) {
+        setPixel(num / stripLen, num % stripLen, red, green, blue);
+    }
 
-	void show(void);
-	int busy(void);
+    int getPixel(uint32_t strip, uint32_t offset);
+    int getPixel(uint32_t num) {
+        return getPixel(num / stripLen, num % stripLen);
+    }
 
-	int numPixels(void) {
-		return stripLen * 8;
-	}
-	int color(uint8_t red, uint8_t green, uint8_t blue) {
-		return (red << 16) | (green << 8) | blue;
-	}
-	
+    void show(void);
+    int busy(void);
+
+    int numPixels(void) {
+        return stripLen * 8;
+    }
+    static int color(uint8_t red, uint8_t green, uint8_t blue) {
+        return (red << 16) | (green << 8) | blue;
+    }
+    
+    int debugDma(int ch)
+    {
+        switch(ch)
+        {
+        case 1:
+            return dma1.channel;
+        case 2:
+            return dma2.channel;
+        case 3:
+            return dma3.channel;
+        }
+        return -1;
+    }
 
 private:
-	static uint16_t stripLen;
-	static void *frameBuffer;
-	static void *drawBuffer;
-	static uint8_t params;
-	static DMAChannel dma1, dma2, dma3;
-	static void isr(void);
+    static uint16_t stripLen;
+    static void *frameBuffer;
+    static void *drawBuffer;
+    static uint8_t params;
+    static DMAChannel dma1, dma2, dma3;
+    static void isr(void);
+    void convert(void);
 };
 
-#endif
+#endif  /* OctoWS2811_h */
