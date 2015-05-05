@@ -27,11 +27,11 @@
 #include <Arduino.h>
 #include "DMAChannel.h"
 
-#if TEENSYDUINO < 120
-#error "Teensyduino version 1.20 or later is required to compile this library."
+#if TEENSYDUINO < 121
+#error "Teensyduino version 1.21 or later is required to compile this library."
 #endif
 #ifdef __AVR__
-#error "The Audio Library only works with Teensy 3.X.  Teensy 2.0 is unsupported."
+#error "OctoWS2811 does not work with Teensy 2.0 or Teensy++ 2.0."
 #endif
 
 #define WS2811_RGB	0	// The WS2811 datasheet documents this way

@@ -33,7 +33,7 @@ DMAChannel OctoWS2811::dma1;
 DMAChannel OctoWS2811::dma2;
 DMAChannel OctoWS2811::dma3;
 
-static const uint8_t ones = 0xFF;
+static uint8_t ones = 0xFF;
 static volatile uint8_t update_in_progress = 0;
 static uint32_t update_completed_at = 0;
 
@@ -101,6 +101,7 @@ void OctoWS2811::begin(void)
 	analogWrite(3, WS2811_TIMING_T0H);
 	analogWrite(4, WS2811_TIMING_T1H);
 
+#if defined(KINETISK)
 	// pin 16 triggers DMA(port B) on rising edge (configure for pin 3's waveform)
 	CORE_PIN16_CONFIG = PORT_PCR_IRQC(1)|PORT_PCR_MUX(3);
 	pinMode(3, INPUT_PULLUP); // pin 3 no longer needed
@@ -113,70 +114,84 @@ void OctoWS2811::begin(void)
 	// pin 4 triggers DMA(port A) on falling edge of high duty waveform
 	CORE_PIN4_CONFIG = PORT_PCR_IRQC(2)|PORT_PCR_MUX(3);
 
+#elif defined(KINETISL)
+	// on Teensy-LC, use timer DMA, not pin DMA
+	//Serial1.println(FTM2_C0SC, HEX);
+	//FTM2_C0SC = 0xA9;
+	//FTM2_C0SC = 0xA9;
+	//uint32_t t = FTM2_C0SC;
+	//FTM2_C0SC = 0xA9;
+	//Serial1.println(t, HEX);
+	CORE_PIN3_CONFIG = 0;
+	CORE_PIN4_CONFIG = 0;
+	//FTM2_C0SC = 0;
+	//FTM2_C1SC = 0;
+	//while (FTM2_C0SC) ;
+	//while (FTM2_C1SC) ;
+	//FTM2_C0SC = 0x99;
+	//FTM2_C1SC = 0x99;
+
+	//MCM_PLACR |= MCM_PLACR_ARB;
+
+#endif
+
 	// DMA channel #1 sets WS2811 high at the beginning of each cycle
-	dma1.TCD->SADDR = &ones;
-	dma1.TCD->SOFF = 0;
-	dma1.TCD->ATTR = DMA_TCD_ATTR_SSIZE(0) | DMA_TCD_ATTR_DSIZE(0);
-	dma1.TCD->NBYTES_MLNO = 1;
-	dma1.TCD->SLAST = 0;
-	dma1.TCD->DADDR = &GPIOD_PSOR;
-	dma1.TCD->DOFF = 0;
-	dma1.TCD->CITER_ELINKNO = bufsize;
-	dma1.TCD->DLASTSGA = 0;
-	dma1.TCD->CSR = DMA_TCD_CSR_DREQ;
-	dma1.TCD->BITER_ELINKNO = bufsize;
+	dma1.source(ones);
+	dma1.destination(GPIOD_PSOR);
+	dma1.transferSize(1);
+	dma1.transferCount(bufsize);
+	dma1.disableOnCompletion();
 
 	// DMA channel #2 writes the pixel data at 20% of the cycle
-	dma2.TCD->SADDR = frameBuffer;
-	dma2.TCD->SOFF = 1;
-	dma2.TCD->ATTR = DMA_TCD_ATTR_SSIZE(0) | DMA_TCD_ATTR_DSIZE(0);
-	dma2.TCD->NBYTES_MLNO = 1;
-	dma2.TCD->SLAST = -bufsize;
-	dma2.TCD->DADDR = &GPIOD_PDOR;
-	dma2.TCD->DOFF = 0;
-	dma2.TCD->CITER_ELINKNO = bufsize;
-	dma2.TCD->DLASTSGA = 0;
-	dma2.TCD->CSR = DMA_TCD_CSR_DREQ;
-	dma2.TCD->BITER_ELINKNO = bufsize;
+	dma2.sourceBuffer((uint8_t *)frameBuffer, bufsize);
+	dma2.destination(GPIOD_PDOR);
+	dma2.transferSize(1);
+	dma2.transferCount(bufsize);
+	dma2.disableOnCompletion();
 
 	// DMA channel #3 clear all the pins low at 48% of the cycle
-	dma3.TCD->SADDR = &ones;
-	dma3.TCD->SOFF = 0;
-	dma3.TCD->ATTR = DMA_TCD_ATTR_SSIZE(0) | DMA_TCD_ATTR_DSIZE(0);
-	dma3.TCD->NBYTES_MLNO = 1;
-	dma3.TCD->SLAST = 0;
-	dma3.TCD->DADDR = &GPIOD_PCOR;
-	dma3.TCD->DOFF = 0;
-	dma3.TCD->CITER_ELINKNO = bufsize;
-	dma3.TCD->DLASTSGA = 0;
-	dma3.TCD->CSR = DMA_TCD_CSR_DREQ | DMA_TCD_CSR_INTMAJOR;
-	dma3.TCD->BITER_ELINKNO = bufsize;
+	dma3.source(ones);
+	dma3.destination(GPIOD_PCOR);
+	dma3.transferSize(1);
+	dma3.transferCount(bufsize);
+	dma3.disableOnCompletion();
+	dma3.interruptAtCompletion();
 
 #ifdef __MK20DX256__
 	MCM_CR = MCM_CR_SRAMLAP(1) | MCM_CR_SRAMUAP(0);
 	AXBS_PRS0 = 0x1032;
 #endif
 
+#if defined(KINETISK)
 	// route the edge detect interrupts to trigger the 3 channels
 	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTB);
 	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTC);
 	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTA);
+#elif defined(KINETISL)
+	// route the timer interrupts to trigger the 3 channels
+	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_OV);
+	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH0);
+	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH1);
+#endif
 
 	// enable a done interrupts when channel #3 completes
 	dma3.attachInterrupt(isr);
-	//pinMode(1, OUTPUT); // testing: oscilloscope trigger
+	//pinMode(9, OUTPUT); // testing: oscilloscope trigger
 }
 
 void OctoWS2811::isr(void)
 {
+	//Serial1.print(".");
+	//Serial1.println(dma3.CFG->DCR, HEX);
+	//Serial1.print(dma3.CFG->DSR_BCR > 24, HEX);
 	dma3.clearInterrupt();
+	//Serial1.print("*");
 	update_completed_at = micros();
 	update_in_progress = 0;
 }
 
 int OctoWS2811::busy(void)
 {
-	//if (DMA_ERQ & 0xE) return 1;
 	if (update_in_progress) return 1;
 	// busy for 50 us after the done interrupt, for WS2811 reset
 	if (micros() - update_completed_at < 50) return 1;
@@ -185,10 +200,10 @@ int OctoWS2811::busy(void)
 
 void OctoWS2811::show(void)
 {
-	uint32_t cv, sc;
-
 	// wait for any prior DMA operation
+	//Serial1.print("1");
 	while (update_in_progress) ; 
+	//Serial1.print("2");
 	// it's ok to copy the drawing buffer to the frame buffer
 	// during the 50us WS2811 reset time
 	if (drawBuffer != frameBuffer) {
@@ -199,10 +214,11 @@ void OctoWS2811::show(void)
 	// wait for WS2811 reset
 	while (micros() - update_completed_at < 50) ;
 
+#if defined(KINETISK)
 	// ok to start, but we must be very careful to begin
 	// without any prior 3 x 800kHz DMA requests pending
-	sc = FTM1_SC;
-	cv = FTM1_C1V;
+	uint32_t sc = FTM1_SC;
+	uint32_t cv = FTM1_C1V;
 	noInterrupts();
 	// CAUTION: this code is timing critical.  Any editing should be
 	// tested by verifying the oscilloscope trigger pulse at the end
@@ -218,7 +234,7 @@ void OctoWS2811::show(void)
 	while (FTM1_CNT > cv) ; // wait for beginning of an 800 kHz cycle
 	while (FTM1_CNT < cv) ;
 	FTM1_SC = sc & 0xE7;	// stop FTM1 timer (hopefully before it rolls over)
-	//digitalWriteFast(1, HIGH); // oscilloscope trigger
+	//digitalWriteFast(9, HIGH); // oscilloscope trigger
 	PORTB_ISFR = (1<<0);    // clear any prior rising edge
 	PORTC_ISFR = (1<<0);	// clear any prior low duty falling edge
 	PORTA_ISFR = (1<<13);	// clear any prior high duty falling edge
@@ -226,8 +242,47 @@ void OctoWS2811::show(void)
 	dma2.enable();		// enable all 3 DMA channels
 	dma3.enable();
 	FTM1_SC = sc;		// restart FTM1 timer
-	//digitalWriteFast(1, LOW);
+	//digitalWriteFast(9, LOW);
+#elif defined(KINETISL)
+	uint32_t sc = FTM2_SC;
+	uint32_t cv = FTM2_C1V;
+	noInterrupts();
+	update_in_progress = 1;
+	while (FTM2_CNT <= cv) ;
+	while (FTM2_CNT > cv) ; // wait for beginning of an 800 kHz cycle
+	while (FTM2_CNT < cv) ;
+	FTM2_SC = 0;		// stop FTM2 timer (hopefully before it rolls over)
+	//digitalWriteFast(9, HIGH); // oscilloscope trigger
+
+
+	dma1.clearComplete();
+	dma2.clearComplete();
+	dma3.clearComplete();
+	uint32_t bufsize = stripLen*24;
+	dma1.transferCount(bufsize);
+	dma2.transferCount(bufsize);
+	dma3.transferCount(bufsize);
+	dma2.sourceBuffer((uint8_t *)frameBuffer, bufsize);
+
+	// clear any pending event flags
+	FTM2_SC = 0x80;
+	FTM2_C0SC = 0xA9;	// clear any previous pending DMA requests
+	FTM2_C1SC = 0xA9;
+	// clear any prior pending DMA requests
+	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_OV);
+	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH0);
+	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH1);
+	//GPIOD_PTOR = 0xFF;
+	//GPIOD_PTOR = 0xFF;
+	dma1.enable();
+	dma2.enable();		// enable all 3 DMA channels
+	dma3.enable();
+	FTM2_SC = 0x188;
+	//digitalWriteFast(9, LOW);
+#endif
+	//Serial1.print("3");
 	interrupts();
+	//Serial1.print("4");
 }
 
 void OctoWS2811::setPixel(uint32_t num, int color)
