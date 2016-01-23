@@ -26,6 +26,10 @@
 
   https://learn.adafruit.com/adalight-diy-ambient-tv-lighting
 
+  For good performance, you may need to use AmbiBox.  Running with
+  Processing has been reported to give only 7 frames/sec.  Details here:
+  https://forums.adafruit.com/viewtopic.php?f=8&t=68444&p=434808#p434808
+
 
   Required Connections    http://www.pjrc.com/store/octo28_adaptor.html
   --------------------
