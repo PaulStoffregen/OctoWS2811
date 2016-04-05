@@ -20,6 +20,8 @@
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
     THE SOFTWARE.
 
+Update: The movie2serial program which transmit data has moved to "extras"
+https://github.com/PaulStoffregen/OctoWS2811/tree/master/extras
  
   Required Connections
   --------------------

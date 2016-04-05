@@ -20,6 +20,8 @@
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
     THE SOFTWARE.
 
+Update: The programs to prepare the SD card video file have moved to "extras"
+https://github.com/PaulStoffregen/OctoWS2811/tree/master/extras
 
   The recommended hardware for SD card playing is:
 
