@@ -41,6 +41,7 @@
 
 #define WS2811_800kHz 0x00	// Nearly all WS2811 are 800 kHz
 #define WS2811_400kHz 0x10	// Adafruit's Flora Pixels
+#define WS2813_800kHz 0x20	// WS2813 are close to 800 kHz but has 300 us frame set delay
 
 
 class OctoWS2811 {
@@ -63,13 +64,14 @@ public:
 	int color(uint8_t red, uint8_t green, uint8_t blue) {
 		return (red << 16) | (green << 8) | blue;
 	}
-	
+
 
 private:
 	static uint16_t stripLen;
 	static void *frameBuffer;
 	static void *drawBuffer;
 	static uint8_t params;
+  uint16_t frameSetDelay;
 	static DMAChannel dma1, dma2, dma3;
 	static void isr(void);
 };

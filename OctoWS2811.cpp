@@ -71,7 +71,6 @@ OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
 void OctoWS2811::begin(void)
 {
 	uint32_t bufsize, frequency;
-
 	bufsize = stripLen*24;
 
 	// set up the buffers
@@ -81,7 +80,7 @@ void OctoWS2811::begin(void)
 	} else {
 		drawBuffer = frameBuffer;
 	}
-	
+
 	// configure the 8 output pins
 	GPIOD_PCOR = 0xFF;
 	pinMode(2, OUTPUT);	// strip #1
@@ -94,7 +93,24 @@ void OctoWS2811::begin(void)
 	pinMode(5, OUTPUT);	// strip #8
 
 	// create the two waveforms for WS2811 low and high bits
-	frequency = (params & WS2811_400kHz) ? 400000 : 800000;
+  switch (params & 0xF0) {
+    case WS2811_400kHz: {
+      frequency = 400000;
+      frameSetDelay = 50;
+    break; }
+    case WS2811_800kHz: {
+      frequency = 800000;
+      frameSetDelay = 50;
+    break; }
+    case WS2813_800kHz: {
+      frequency = 800000;
+      frameSetDelay = 300;
+    break; }
+    default: {
+      frequency = 800000;
+      frameSetDelay = 50;
+    break; }
+  }
 	analogWriteResolution(8);
 	analogWriteFrequency(3, frequency);
 	analogWriteFrequency(4, frequency);
@@ -193,8 +209,8 @@ void OctoWS2811::isr(void)
 int OctoWS2811::busy(void)
 {
 	if (update_in_progress) return 1;
-	// busy for 50 us after the done interrupt, for WS2811 reset
-	if (micros() - update_completed_at < 50) return 1;
+	// busy for 50 (or 300 for ws2813) us after the done interrupt, for WS2811 reset
+	if (micros() - update_completed_at < frameSetDelay) return 1;
 	return 0;
 }
 
@@ -202,7 +218,7 @@ void OctoWS2811::show(void)
 {
 	// wait for any prior DMA operation
 	//Serial1.print("1");
-	while (update_in_progress) ; 
+	while (update_in_progress) ;
 	//Serial1.print("2");
 	// it's ok to copy the drawing buffer to the frame buffer
 	// during the 50us WS2811 reset time
@@ -212,7 +228,7 @@ void OctoWS2811::show(void)
 		memcpy(frameBuffer, drawBuffer, stripLen * 24);
 	}
 	// wait for WS2811 reset
-	while (micros() - update_completed_at < 50) ;
+	while (micros() - update_completed_at < frameSetDelay) ;
 
 #if defined(KINETISK)
 	// ok to start, but we must be very careful to begin
@@ -230,7 +246,7 @@ void OctoWS2811::show(void)
 	// performed to create realistic bus usage.  Even then, you really
 	// should not mess with this timing critical code!
 	update_in_progress = 1;
-	while (FTM1_CNT <= cv) ; 
+	while (FTM1_CNT <= cv) ;
 	while (FTM1_CNT > cv) ; // wait for beginning of an 800 kHz cycle
 	while (FTM1_CNT < cv) ;
 	FTM1_SC = sc & 0xE7;	// stop FTM1 timer (hopefully before it rolls over)
@@ -289,7 +305,7 @@ void OctoWS2811::setPixel(uint32_t num, int color)
 {
 	uint32_t strip, offset, mask;
 	uint8_t bit, *p;
-	
+
 	switch (params & 7) {
 	  case WS2811_RBG:
 		color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
@@ -344,5 +360,3 @@ int OctoWS2811::getPixel(uint32_t num)
 	}
 	return color;
 }
-
-
