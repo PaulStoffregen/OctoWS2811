@@ -62,6 +62,17 @@ void setup() {
 #define ORANGE 0xE05800
 #define WHITE  0xFFFFFF
 
+// Less intense...
+/*
+#define RED    0x160000
+#define GREEN  0x001600
+#define BLUE   0x000016
+#define YELLOW 0x101400
+#define PINK   0x120009
+#define ORANGE 0x100400
+#define WHITE  0x101010
+*/
+
 void loop() {
   int microsec = 2000000 / leds.numPixels();  // change them all in 2 seconds
 
