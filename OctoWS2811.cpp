@@ -37,7 +37,6 @@ static uint8_t ones = 0xFF;
 static volatile uint8_t update_in_progress = 0;
 static uint32_t update_completed_at = 0;
 
-
 OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config)
 {
 	stripLen = numPerStrip;
@@ -93,44 +92,61 @@ void OctoWS2811::begin(void)
 	pinMode(5, OUTPUT);	// strip #8
 
 	// create the two waveforms for WS2811 low and high bits
-  switch (params & 0xF0) {
-    case WS2811_400kHz: {
-      frequency = 400000;
-      frameSetDelay = 50;
-    break; }
-    case WS2811_800kHz: {
-      frequency = 800000;
-      frameSetDelay = 50;
-    break; }
-    case WS2813_800kHz: {
-      frequency = 800000;
-      frameSetDelay = 300;
-    break; }
-    default: {
-      frequency = 800000;
-      frameSetDelay = 50;
-    break; }
-  }
+	switch (params & 0xF0) {
+	case WS2811_400kHz:
+		frequency = 400000;
+		frameSetDelay = 50;
+		break;
+	case WS2811_800kHz:
+		frequency = 800000;
+		frameSetDelay = 50;
+		break;
+	case WS2813_800kHz:
+		frequency = 800000;
+		frameSetDelay = 300;
+		break;
+	default:
+		frequency = 800000;
+		frameSetDelay = 50;
+	}
+
+
+#if defined(__MK20DX128__)
+	FTM1_SC = 0;
+	FTM1_CNT = 0;
+	uint32_t mod = (F_BUS + frequency / 2) / frequency;
+	FTM1_MOD = mod - 1;
+	FTM1_SC = FTM_SC_CLKS(1) | FTM_SC_PS(0);
+	FTM1_C0SC = 0x69;
+	FTM1_C1SC = 0x69;
+	FTM1_C0V = (mod * WS2811_TIMING_T0H) >> 8;
+	FTM1_C1V = (mod * WS2811_TIMING_T1H) >> 8;
+	// pin 16 triggers DMA(port B) on rising edge
+	CORE_PIN16_CONFIG = PORT_PCR_IRQC(1)|PORT_PCR_MUX(3);
+	//CORE_PIN4_CONFIG = PORT_PCR_MUX(3); // testing only
+
+#elif defined(__MK20DX256__)
 	analogWriteResolution(8);
 	analogWriteFrequency(3, frequency);
 	analogWriteFrequency(4, frequency);
 	analogWrite(3, WS2811_TIMING_T0H);
 	analogWrite(4, WS2811_TIMING_T1H);
-
-#if defined(KINETISK)
 	// pin 16 triggers DMA(port B) on rising edge (configure for pin 3's waveform)
 	CORE_PIN16_CONFIG = PORT_PCR_IRQC(1)|PORT_PCR_MUX(3);
 	pinMode(3, INPUT_PULLUP); // pin 3 no longer needed
-
 	// pin 15 triggers DMA(port C) on falling edge of low duty waveform
 	// pin 15 and 16 must be connected by the user: 16 is output, 15 is input
 	pinMode(15, INPUT);
 	CORE_PIN15_CONFIG = PORT_PCR_IRQC(2)|PORT_PCR_MUX(1);
-
 	// pin 4 triggers DMA(port A) on falling edge of high duty waveform
 	CORE_PIN4_CONFIG = PORT_PCR_IRQC(2)|PORT_PCR_MUX(3);
 
-#elif defined(KINETISL)
+#elif defined(__MKL26Z64__)
+	analogWriteResolution(8);
+	analogWriteFrequency(3, frequency);
+	analogWriteFrequency(4, frequency);
+	analogWrite(3, WS2811_TIMING_T0H);
+	analogWrite(4, WS2811_TIMING_T1H);
 	// on Teensy-LC, use timer DMA, not pin DMA
 	//Serial1.println(FTM2_C0SC, HEX);
 	//FTM2_C0SC = 0xA9;
@@ -169,21 +185,25 @@ void OctoWS2811::begin(void)
 	dma3.source(ones);
 	dma3.destination(GPIOD_PCOR);
 	dma3.transferSize(1);
-	dma3.transferCount(bufsize);
+	dma3.transferCount(bufsize + 1);
 	dma3.disableOnCompletion();
 	dma3.interruptAtCompletion();
 
-#ifdef __MK20DX256__
+	DMAPriorityOrder(dma3, dma2, dma1);
+
+#if defined(__MK20DX128__)
+	// route the edge detect interrupts to trigger the 3 channels
+	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTB);
+	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM1_CH0);
+	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM1_CH1);
+#elif defined(__MK20DX256__)
 	MCM_CR = MCM_CR_SRAMLAP(1) | MCM_CR_SRAMUAP(0);
 	AXBS_PRS0 = 0x1032;
-#endif
-
-#if defined(KINETISK)
 	// route the edge detect interrupts to trigger the 3 channels
 	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTB);
 	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTC);
 	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTA);
-#elif defined(KINETISL)
+#elif defined(__MKL26Z64__)
 	// route the timer interrupts to trigger the 3 channels
 	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_OV);
 	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH0);
@@ -197,6 +217,7 @@ void OctoWS2811::begin(void)
 
 void OctoWS2811::isr(void)
 {
+	//digitalWriteFast(9, HIGH);
 	//Serial1.print(".");
 	//Serial1.println(dma3.CFG->DCR, HEX);
 	//Serial1.print(dma3.CFG->DSR_BCR > 24, HEX);
@@ -204,6 +225,7 @@ void OctoWS2811::isr(void)
 	//Serial1.print("*");
 	update_completed_at = micros();
 	update_in_progress = 0;
+	//digitalWriteFast(9, LOW);
 }
 
 int OctoWS2811::busy(void)
@@ -230,7 +252,29 @@ void OctoWS2811::show(void)
 	// wait for WS2811 reset
 	while (micros() - update_completed_at < frameSetDelay) ;
 
-#if defined(KINETISK)
+#if defined(__MK20DX128__)
+	// ok to start, but we must be very careful to begin
+	// without any prior 3 x 800kHz DMA requests pending
+	uint32_t cv = FTM1_C1V;
+	noInterrupts();
+	// CAUTION: this code is timing critical.
+	while (FTM1_CNT <= cv) ;
+	while (FTM1_CNT >= cv) ; // wait for beginning of an 800 kHz cycle
+	while (FTM1_CNT < cv -2) ;
+	FTM1_SC = 0;		// stop FTM1 timer (hopefully before it rolls over)
+	//FTM1_SC = 0;
+	update_in_progress = 1;
+	digitalWriteFast(9, HIGH); // oscilloscope trigger
+	PORTB_ISFR = (1<<0);    // clear any prior rising edge
+	FTM1_C0SC = 0x69;
+	FTM1_C1SC = 0x69;
+	dma1.enable();
+	dma2.enable();		// enable all 3 DMA channels
+	dma3.enable();
+	FTM1_SC = FTM_SC_CLKS(1) | FTM_SC_PS(0); // restart FTM1 timer
+	digitalWriteFast(9, LOW);
+
+#elif defined(__MK20DX256__)
 	// ok to start, but we must be very careful to begin
 	// without any prior 3 x 800kHz DMA requests pending
 	uint32_t sc = FTM1_SC;
@@ -259,7 +303,8 @@ void OctoWS2811::show(void)
 	dma3.enable();
 	FTM1_SC = sc;		// restart FTM1 timer
 	//digitalWriteFast(9, LOW);
-#elif defined(KINETISL)
+
+#elif defined(__MKL26Z64__)
 	uint32_t sc = FTM2_SC;
 	uint32_t cv = FTM2_C1V;
 	noInterrupts();
@@ -269,8 +314,6 @@ void OctoWS2811::show(void)
 	while (FTM2_CNT < cv) ;
 	FTM2_SC = 0;		// stop FTM2 timer (hopefully before it rolls over)
 	//digitalWriteFast(9, HIGH); // oscilloscope trigger
-
-
 	dma1.clearComplete();
 	dma2.clearComplete();
 	dma3.clearComplete();
@@ -279,7 +322,6 @@ void OctoWS2811::show(void)
 	dma2.transferCount(bufsize);
 	dma3.transferCount(bufsize);
 	dma2.sourceBuffer((uint8_t *)frameBuffer, bufsize);
-
 	// clear any pending event flags
 	FTM2_SC = 0x80;
 	FTM2_C0SC = 0xA9;	// clear any previous pending DMA requests
