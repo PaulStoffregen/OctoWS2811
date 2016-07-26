@@ -66,7 +66,6 @@ OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
 // Discussion about timing and flicker & color shift issues:
 // http://forum.pjrc.com/threads/23877-WS2812B-compatible-with-OctoWS2811-library?p=38190&viewfull=1#post38190
 
-
 void OctoWS2811::begin(void)
 {
 	uint32_t bufsize, frequency;
@@ -126,20 +125,19 @@ void OctoWS2811::begin(void)
 	//CORE_PIN4_CONFIG = PORT_PCR_MUX(3); // testing only
 
 #elif defined(__MK20DX256__)
-	analogWriteResolution(8);
-	analogWriteFrequency(3, frequency);
-	analogWriteFrequency(4, frequency);
-	analogWrite(3, WS2811_TIMING_T0H);
-	analogWrite(4, WS2811_TIMING_T1H);
-	// pin 16 triggers DMA(port B) on rising edge (configure for pin 3's waveform)
-	CORE_PIN16_CONFIG = PORT_PCR_IRQC(1)|PORT_PCR_MUX(3);
-	pinMode(3, INPUT_PULLUP); // pin 3 no longer needed
-	// pin 15 triggers DMA(port C) on falling edge of low duty waveform
-	// pin 15 and 16 must be connected by the user: 16 is output, 15 is input
-	pinMode(15, INPUT);
-	CORE_PIN15_CONFIG = PORT_PCR_IRQC(2)|PORT_PCR_MUX(1);
-	// pin 4 triggers DMA(port A) on falling edge of high duty waveform
-	CORE_PIN4_CONFIG = PORT_PCR_IRQC(2)|PORT_PCR_MUX(3);
+	FTM2_SC = 0;
+	FTM2_CNT = 0;
+	uint32_t mod = (F_BUS + frequency / 2) / frequency;
+	FTM2_MOD = mod - 1;
+	FTM2_SC = FTM_SC_CLKS(1) | FTM_SC_PS(0);
+	FTM2_C0SC = 0x69;
+	FTM2_C1SC = 0x69;
+	FTM2_C0V = (mod * WS2811_TIMING_T0H) >> 8;
+	FTM2_C1V = (mod * WS2811_TIMING_T1H) >> 8;
+	// pin 32 is FTM2_CH0, PTB18, triggers DMA(port B) on rising edge
+	// pin 25 is FTM2_CH1, PTB19
+	CORE_PIN32_CONFIG = PORT_PCR_IRQC(1)|PORT_PCR_MUX(3);
+	//CORE_PIN25_CONFIG = PORT_PCR_MUX(3); // testing only
 
 #elif defined(__MKL26Z64__)
 	analogWriteResolution(8);
@@ -174,35 +172,33 @@ void OctoWS2811::begin(void)
 	dma1.transferCount(bufsize);
 	dma1.disableOnCompletion();
 
-	// DMA channel #2 writes the pixel data at 20% of the cycle
+	// DMA channel #2 writes the pixel data at 23% of the cycle
 	dma2.sourceBuffer((uint8_t *)frameBuffer, bufsize);
 	dma2.destination(GPIOD_PDOR);
 	dma2.transferSize(1);
 	dma2.transferCount(bufsize);
 	dma2.disableOnCompletion();
 
-	// DMA channel #3 clear all the pins low at 48% of the cycle
+	// DMA channel #3 clear all the pins low at 69% of the cycle
 	dma3.source(ones);
 	dma3.destination(GPIOD_PCOR);
 	dma3.transferSize(1);
-	dma3.transferCount(bufsize + 1);
+	dma3.transferCount(bufsize);
 	dma3.disableOnCompletion();
 	dma3.interruptAtCompletion();
-
-	DMAPriorityOrder(dma3, dma2, dma1);
 
 #if defined(__MK20DX128__)
 	// route the edge detect interrupts to trigger the 3 channels
 	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTB);
 	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM1_CH0);
 	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM1_CH1);
+	DMAPriorityOrder(dma3, dma2, dma1);
 #elif defined(__MK20DX256__)
-	MCM_CR = MCM_CR_SRAMLAP(1) | MCM_CR_SRAMUAP(0);
-	AXBS_PRS0 = 0x1032;
 	// route the edge detect interrupts to trigger the 3 channels
 	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTB);
-	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTC);
-	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_PORTA);
+	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH0);
+	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH1);
+	DMAPriorityOrder(dma3, dma2, dma1);
 #elif defined(__MKL26Z64__)
 	// route the timer interrupts to trigger the 3 channels
 	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_OV);
@@ -251,57 +247,58 @@ void OctoWS2811::show(void)
 	}
 	// wait for WS2811 reset
 	while (micros() - update_completed_at < frameSetDelay) ;
-
-#if defined(__MK20DX128__)
 	// ok to start, but we must be very careful to begin
 	// without any prior 3 x 800kHz DMA requests pending
+
+#if defined(__MK20DX128__)
 	uint32_t cv = FTM1_C1V;
 	noInterrupts();
 	// CAUTION: this code is timing critical.
 	while (FTM1_CNT <= cv) ;
-	while (FTM1_CNT >= cv) ; // wait for beginning of an 800 kHz cycle
-	while (FTM1_CNT < cv -2) ;
-	FTM1_SC = 0;		// stop FTM1 timer (hopefully before it rolls over)
-	//FTM1_SC = 0;
-	update_in_progress = 1;
-	digitalWriteFast(9, HIGH); // oscilloscope trigger
-	PORTB_ISFR = (1<<0);    // clear any prior rising edge
-	FTM1_C0SC = 0x69;
-	FTM1_C1SC = 0x69;
-	dma1.enable();
-	dma2.enable();		// enable all 3 DMA channels
-	dma3.enable();
-	FTM1_SC = FTM_SC_CLKS(1) | FTM_SC_PS(0); // restart FTM1 timer
-	digitalWriteFast(9, LOW);
-
-#elif defined(__MK20DX256__)
-	// ok to start, but we must be very careful to begin
-	// without any prior 3 x 800kHz DMA requests pending
-	uint32_t sc = FTM1_SC;
-	uint32_t cv = FTM1_C1V;
-	noInterrupts();
-	// CAUTION: this code is timing critical.  Any editing should be
-	// tested by verifying the oscilloscope trigger pulse at the end
-	// always occurs while both waveforms are still low.  Simply
-	// counting CPU cycles does not take into account other complex
-	// factors, like flash cache misses and bus arbitration from USB
-	// or other DMA.  Testing should be done with the oscilloscope
-	// display set at infinite persistence and a variety of other I/O
-	// performed to create realistic bus usage.  Even then, you really
-	// should not mess with this timing critical code!
-	update_in_progress = 1;
-	while (FTM1_CNT <= cv) ;
 	while (FTM1_CNT > cv) ; // wait for beginning of an 800 kHz cycle
 	while (FTM1_CNT < cv) ;
-	FTM1_SC = sc & 0xE7;	// stop FTM1 timer (hopefully before it rolls over)
+	FTM1_SC = 0;            // stop FTM1 timer (hopefully before it rolls over)
+	update_in_progress = 1;
 	//digitalWriteFast(9, HIGH); // oscilloscope trigger
 	PORTB_ISFR = (1<<0);    // clear any prior rising edge
-	PORTC_ISFR = (1<<0);	// clear any prior low duty falling edge
-	PORTA_ISFR = (1<<13);	// clear any prior high duty falling edge
+	uint32_t tmp __attribute__((unused));
+	FTM1_C0SC = 0x28;
+	tmp = FTM1_C0SC;        // clear any prior timer DMA triggers
+	FTM1_C0SC = 0x69;
+	FTM1_C1SC = 0x28;
+	tmp = FTM1_C1SC;
+	FTM1_C1SC = 0x69;
 	dma1.enable();
-	dma2.enable();		// enable all 3 DMA channels
+	dma2.enable();          // enable all 3 DMA channels
 	dma3.enable();
-	FTM1_SC = sc;		// restart FTM1 timer
+	FTM1_SC = FTM_SC_CLKS(1) | FTM_SC_PS(0); // restart FTM1 timer
+	//digitalWriteFast(9, LOW);
+
+#elif defined(__MK20DX256__)
+	FTM2_C0SC = 0x28;
+	FTM2_C1SC = 0x28;
+	delay(1);
+	uint32_t cv = FTM2_C1V;
+	noInterrupts();
+	// CAUTION: this code is timing critical.
+	while (FTM2_CNT <= cv) ;
+	while (FTM2_CNT > cv) ; // wait for beginning of an 800 kHz cycle
+	while (FTM2_CNT < cv) ;
+	FTM2_SC = 0;             // stop FTM2 timer (hopefully before it rolls over)
+	update_in_progress = 1;
+	//digitalWriteFast(9, HIGH); // oscilloscope trigger
+	PORTB_ISFR = (1<<18);    // clear any prior rising edge
+	uint32_t tmp __attribute__((unused));
+	FTM2_C0SC = 0x28;
+	tmp = FTM2_C0SC;         // clear any prior timer DMA triggers
+	FTM2_C0SC = 0x69;
+	FTM2_C1SC = 0x28;
+	tmp = FTM2_C1SC;
+	FTM2_C1SC = 0x69;
+	dma1.enable();
+	dma2.enable();           // enable all 3 DMA channels
+	dma3.enable();
+	FTM2_SC = FTM_SC_CLKS(1) | FTM_SC_PS(0); // restart FTM2 timer
 	//digitalWriteFast(9, LOW);
 
 #elif defined(__MKL26Z64__)
