@@ -1,6 +1,8 @@
 /*  OctoWS2811 - High Performance WS2811 LED Display Library
     http://www.pjrc.com/teensy/td_libs_OctoWS2811.html
     Copyright (c) 2013 Paul Stoffregen, PJRC.COM, LLC
+    Some Teensy-LC support contributed by Mark Baysinger.
+    https://forum.pjrc.com/threads/40863-Teensy-LC-port-of-OctoWS2811
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -153,28 +155,15 @@ void OctoWS2811::begin(void)
 	PORTA_PCR10 = PORT_PCR_IRQC(1)|PORT_PCR_MUX(3);
 
 #elif defined(__MKL26Z64__)
-	analogWriteResolution(8);
-	analogWriteFrequency(3, frequency);
-	analogWriteFrequency(4, frequency);
-	analogWrite(3, WS2811_TIMING_T0H);
-	analogWrite(4, WS2811_TIMING_T1H);
-	// on Teensy-LC, use timer DMA, not pin DMA
-	//Serial1.println(FTM2_C0SC, HEX);
-	//FTM2_C0SC = 0xA9;
-	//FTM2_C0SC = 0xA9;
-	//uint32_t t = FTM2_C0SC;
-	//FTM2_C0SC = 0xA9;
-	//Serial1.println(t, HEX);
-	CORE_PIN3_CONFIG = 0;
-	CORE_PIN4_CONFIG = 0;
-	//FTM2_C0SC = 0;
-	//FTM2_C1SC = 0;
-	//while (FTM2_C0SC) ;
-	//while (FTM2_C1SC) ;
-	//FTM2_C0SC = 0x99;
-	//FTM2_C1SC = 0x99;
-
-	//MCM_PLACR |= MCM_PLACR_ARB;
+	FTM2_SC = 0;
+	FTM2_CNT = 0;
+	uint32_t mod = F_CPU / frequency;
+	FTM2_MOD = mod - 1;
+	FTM2_SC = FTM_SC_CLKS(1) | FTM_SC_PS(0);
+	FTM2_C0SC = FTM_CSC_CHF | FTM_CSC_MSB | FTM_CSC_ELSB;
+	FTM2_C1SC = FTM_CSC_CHF | FTM_CSC_MSB | FTM_CSC_ELSB;
+	TPM2_C0V = mod - ((mod * WS2811_TIMING_T1H) >> 8);
+	TPM2_C1V = mod - ((mod * WS2811_TIMING_T1H) >> 8) + ((mod * WS2811_TIMING_T0H) >> 8);
 
 #endif
 
@@ -220,9 +209,9 @@ void OctoWS2811::begin(void)
 	DMAPriorityOrder(dma3, dma2, dma1);
 #elif defined(__MKL26Z64__)
 	// route the timer interrupts to trigger the 3 channels
-	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_OV);
-	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH0);
-	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH1);
+	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_TPM2_CH0);
+	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_TPM2_CH1);
+	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_OV);
 #endif
 
 	// enable a done interrupts when channel #3 completes
@@ -237,6 +226,9 @@ void OctoWS2811::isr(void)
 	//Serial1.println(dma3.CFG->DCR, HEX);
 	//Serial1.print(dma3.CFG->DSR_BCR > 24, HEX);
 	dma3.clearInterrupt();
+#if defined(__MKL26Z64__)
+	GPIOD_PCOR = 0xFF;
+#endif
 	//Serial1.print("*");
 	update_completed_at = micros();
 	update_in_progress = 0;
@@ -348,14 +340,14 @@ void OctoWS2811::show(void)
 	//digitalWriteFast(9, LOW);
 
 #elif defined(__MKL26Z64__)
-	uint32_t sc = FTM2_SC;
+	uint32_t sc __attribute__((unused)) = FTM2_SC;
 	uint32_t cv = FTM2_C1V;
 	noInterrupts();
-	update_in_progress = 1;
 	while (FTM2_CNT <= cv) ;
 	while (FTM2_CNT > cv) ; // wait for beginning of an 800 kHz cycle
 	while (FTM2_CNT < cv) ;
 	FTM2_SC = 0;		// stop FTM2 timer (hopefully before it rolls over)
+	update_in_progress = 1;
 	//digitalWriteFast(9, HIGH); // oscilloscope trigger
 	dma1.clearComplete();
 	dma2.clearComplete();
@@ -366,19 +358,15 @@ void OctoWS2811::show(void)
 	dma3.transferCount(bufsize);
 	dma2.sourceBuffer((uint8_t *)frameBuffer, bufsize);
 	// clear any pending event flags
-	FTM2_SC = 0x80;
-	FTM2_C0SC = 0xA9;	// clear any previous pending DMA requests
-	FTM2_C1SC = 0xA9;
+	FTM2_SC = FTM_SC_TOF;
+	FTM2_C0SC = FTM_CSC_CHF | FTM_CSC_MSB | FTM_CSC_ELSB | FTM_CSC_DMA;
+	FTM2_C1SC = FTM_CSC_CHF | FTM_CSC_MSB | FTM_CSC_ELSB | FTM_CSC_DMA;
 	// clear any prior pending DMA requests
-	dma1.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_OV);
-	dma2.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH0);
-	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_FTM2_CH1);
-	//GPIOD_PTOR = 0xFF;
-	//GPIOD_PTOR = 0xFF;
 	dma1.enable();
 	dma2.enable();		// enable all 3 DMA channels
 	dma3.enable();
-	FTM2_SC = 0x188;
+	FTM2_CNT = 0; // writing any value resets counter
+	FTM2_SC = FTM_SC_DMA | FTM_SC_CLKS(1) | FTM_SC_PS(0);
 	//digitalWriteFast(9, LOW);
 #endif
 	//Serial1.print("3");
