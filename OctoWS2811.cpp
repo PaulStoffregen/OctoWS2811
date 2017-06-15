@@ -96,19 +96,15 @@ void OctoWS2811::begin(void)
 	switch (params & 0xF0) {
 	case WS2811_400kHz:
 		frequency = 400000;
-		frameSetDelay = 50;
 		break;
 	case WS2811_800kHz:
 		frequency = 800000;
-		frameSetDelay = 50;
 		break;
 	case WS2813_800kHz:
 		frequency = 800000;
-		frameSetDelay = 300;
 		break;
 	default:
 		frequency = 800000;
-		frameSetDelay = 50;
 	}
 
 
@@ -239,7 +235,7 @@ int OctoWS2811::busy(void)
 {
 	if (update_in_progress) return 1;
 	// busy for 50 (or 300 for ws2813) us after the done interrupt, for WS2811 reset
-	if (micros() - update_completed_at < frameSetDelay) return 1;
+	if (micros() - update_completed_at < 300) return 1;
 	return 0;
 }
 
@@ -257,7 +253,7 @@ void OctoWS2811::show(void)
 		memcpy(frameBuffer, drawBuffer, stripLen * 24);
 	}
 	// wait for WS2811 reset
-	while (micros() - update_completed_at < frameSetDelay) ;
+	while (micros() - update_completed_at < 300) ;
 	// ok to start, but we must be very careful to begin
 	// without any prior 3 x 800kHz DMA requests pending
 

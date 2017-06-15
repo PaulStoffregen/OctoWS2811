@@ -73,7 +73,6 @@ private:
 	static void *frameBuffer;
 	static void *drawBuffer;
 	static uint8_t params;
-  uint16_t frameSetDelay;
 	static DMAChannel dma1, dma2, dma3;
 	static void isr(void);
 };
