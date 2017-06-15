@@ -258,13 +258,14 @@ void OctoWS2811::show(void)
 	// without any prior 3 x 800kHz DMA requests pending
 
 #if defined(__MK20DX128__)
-	uint32_t cv = FTM1_C1V;
+	uint32_t cv = FTM1_C0V;
 	noInterrupts();
 	// CAUTION: this code is timing critical.
 	while (FTM1_CNT <= cv) ;
 	while (FTM1_CNT > cv) ; // wait for beginning of an 800 kHz cycle
 	while (FTM1_CNT < cv) ;
 	FTM1_SC = 0;            // stop FTM1 timer (hopefully before it rolls over)
+	FTM1_CNT = 0;
 	update_in_progress = 1;
 	//digitalWriteFast(9, HIGH); // oscilloscope trigger
 	PORTB_ISFR = (1<<0);    // clear any prior rising edge
