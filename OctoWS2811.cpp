@@ -385,7 +385,13 @@ void OctoWS2811::setPixel(uint32_t num, int color)
 		color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
 		break;
 	  case WS2811_GBR:
+		color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
+		break;
+	  case WS2811_BRG:
 		color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
+		break;
+	  case WS2811_BGR:
+		color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
 		break;
 	  default:
 		break;
