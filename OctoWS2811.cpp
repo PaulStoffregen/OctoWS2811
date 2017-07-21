@@ -81,6 +81,8 @@ void OctoWS2811::begin(void)
 		drawBuffer = frameBuffer;
 	}
 
+#if defined(__MK20DX128__)
+	// ??? Stick with 8-bit?
 	// configure the 8 output pins
 	GPIOD_PCOR = 0xFF;
 	pinMode(2, OUTPUT);	// strip #1
@@ -92,6 +94,8 @@ void OctoWS2811::begin(void)
 	pinMode(21, OUTPUT);	// strip #7
 	pinMode(5, OUTPUT);	// strip #8
 
+#elif defined(__MK20DX256__)
+	// Teensy 3.2
 	// Configure the 12 output pins
 	GPIOC_PCOR = 0xFFFF;
 	pinMode(15, OUTPUT);    // PTC0
@@ -106,6 +110,35 @@ void OctoWS2811::begin(void)
 	pinMode(27, OUTPUT);    // PTC9
 	pinMode(29, OUTPUT);    // PTC10
 	pinMode(30, OUTPUT);    // PTC11
+
+#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)
+	// Teensy 3.5/3.6
+	GPIOC_PCOR = 0xFFFF;
+	pinMode(15, OUTPUT);	// PTC0
+	pinMode(22, OUTPUT);	// PTC1
+	pinMode(23, OUTPUT);	// PTC2
+	pinMode(9, OUTPUT);		// PTC3
+	pinMode(10, OUTPUT);	// PTC4
+	pinMode(13, OUTPUT);	// PTC5
+	pinMode(11, OUTPUT);	// PTC6
+	pinMode(12, OUTPUT);	// PTC7
+	pinMode(35, OUTPUT);	// PTC8
+	pinMode(36, OUTPUT);	// PTC9
+	pinMode(37, OUTPUT);	// PTC10
+	pinMode(38, OUTPUT);	// PTC11
+
+	// Alternatively, you could also get a total of 15 on GPIOD:
+	/*
+	pinMode(47, OUTPUT);        // PTD8
+	pinMode(48, OUTPUT);        // PTD9
+	//pinMode(B3??, OUTPUT);    // PTD10 is not exported on Teensy 3.6 :(
+	pinMode(55, OUTPUT);		// PTD11
+	pinMode(53, OUTPUT);		// PTD12
+	pinMode(52, OUTPUT);		// PTD13
+	pinMode(51, OUTPUT);		// PTD14
+	pinMode(54, OUTPUT);		// PTD15
+	*/
+#endif
 
 	// create the two waveforms for WS2811 low and high bits
 	switch (params & 0xF0) {
