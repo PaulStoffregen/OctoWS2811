@@ -35,7 +35,7 @@ DMAChannel OctoWS2811::dma1;
 DMAChannel OctoWS2811::dma2;
 DMAChannel OctoWS2811::dma3;
 
-static uint8_t ones = 0xFF;
+static uint16_t ones = 0xFFFF;
 static volatile uint8_t update_in_progress = 0;
 static uint32_t update_completed_at = 0;
 
@@ -91,6 +91,21 @@ void OctoWS2811::begin(void)
 	pinMode(20, OUTPUT);	// strip #6
 	pinMode(21, OUTPUT);	// strip #7
 	pinMode(5, OUTPUT);	// strip #8
+
+	// Configure the 12 output pins
+	GPIOC_PCOR = 0xFFFF;
+	pinMode(15, OUTPUT);    // PTC0
+	pinMode(22, OUTPUT);    // PTC1
+	pinMode(23, OUTPUT);    // PTC2
+	pinMode(9, OUTPUT);     // PTC3
+	pinMode(10, OUTPUT);    // PTC4
+	pinMode(13, OUTPUT);    // PTC5
+	pinMode(11, OUTPUT);    // PTC6
+	pinMode(12, OUTPUT);    // PTC7
+	pinMode(28, OUTPUT);    // PTC8
+	pinMode(27, OUTPUT);    // PTC9
+	pinMode(29, OUTPUT);    // PTC10
+	pinMode(30, OUTPUT);    // PTC11
 
 	// create the two waveforms for WS2811 low and high bits
 	switch (params & 0xF0) {
@@ -165,22 +180,23 @@ void OctoWS2811::begin(void)
 
 	// DMA channel #1 sets WS2811 high at the beginning of each cycle
 	dma1.source(ones);
-	dma1.destination(GPIOD_PSOR);
-	dma1.transferSize(1);
+	dma1.destination(GPIOC_PSOR);
+	dma1.transferSize(2);
 	dma1.transferCount(bufsize);
 	dma1.disableOnCompletion();
 
 	// DMA channel #2 writes the pixel data at 23% of the cycle
-	dma2.sourceBuffer((uint8_t *)frameBuffer, bufsize);
-	dma2.destination(GPIOD_PDOR);
-	dma2.transferSize(1);
+	dma2.sourceBuffer((volatile const uint16_t *)frameBuffer, bufsize*2);
+	dma2.destination(GPIOC_PDOR);
+	dma2.transferSize(2);
 	dma2.transferCount(bufsize);
 	dma2.disableOnCompletion();
+    dma2.interruptAtCompletion();
 
 	// DMA channel #3 clear all the pins low at 69% of the cycle
 	dma3.source(ones);
-	dma3.destination(GPIOD_PCOR);
-	dma3.transferSize(1);
+	dma3.destination(GPIOC_PCOR);
+	dma3.transferSize(2);
 	dma3.transferCount(bufsize);
 	dma3.disableOnCompletion();
 	dma3.interruptAtCompletion();
@@ -215,6 +231,7 @@ void OctoWS2811::begin(void)
 	//pinMode(9, OUTPUT); // testing: oscilloscope trigger
 }
 
+
 void OctoWS2811::isr(void)
 {
 	//digitalWriteFast(9, HIGH);
@@ -223,7 +240,7 @@ void OctoWS2811::isr(void)
 	//Serial1.print(dma3.CFG->DSR_BCR > 24, HEX);
 	dma3.clearInterrupt();
 #if defined(__MKL26Z64__)
-	GPIOD_PCOR = 0xFF;
+	GPIOD_PCOR = 0xFFFF;
 #endif
 	//Serial1.print("*");
 	update_completed_at = micros();
@@ -250,7 +267,7 @@ void OctoWS2811::show(void)
 	if (drawBuffer != frameBuffer) {
 		// TODO: this could be faster with DMA, especially if the
 		// buffers are 32 bit aligned... but does it matter?
-		memcpy(frameBuffer, drawBuffer, stripLen * 24);
+		memcpy(frameBuffer, drawBuffer, stripLen * 24*2);
 	}
 	// wait for WS2811 reset
 	while (micros() - update_completed_at < 300) ;
@@ -310,6 +327,7 @@ void OctoWS2811::show(void)
 	FTM2_SC = FTM_SC_CLKS(1) | FTM_SC_PS(0); // restart FTM2 timer
 	//digitalWriteFast(9, LOW);
 
+
 #elif defined(__MK64FX512__) || defined(__MK66FX1M0__)
 	FTM2_C0SC = 0x28;
 	FTM2_C1SC = 0x28;
@@ -354,7 +372,7 @@ void OctoWS2811::show(void)
 	dma1.transferCount(bufsize);
 	dma2.transferCount(bufsize);
 	dma3.transferCount(bufsize);
-	dma2.sourceBuffer((uint8_t *)frameBuffer, bufsize);
+	dma2.sourceBuffer((uint16_t *)frameBuffer, bufsize);
 	// clear any pending event flags
 	FTM2_SC = FTM_SC_TOF;
 	FTM2_C0SC = FTM_CSC_CHF | FTM_CSC_MSB | FTM_CSC_ELSB | FTM_CSC_DMA;
@@ -375,7 +393,7 @@ void OctoWS2811::show(void)
 void OctoWS2811::setPixel(uint32_t num, int color)
 {
 	uint32_t strip, offset, mask;
-	uint8_t bit, *p;
+	uint16_t bit, *p;
 
 	switch (params & 7) {
 	  case WS2811_RBG:
@@ -397,9 +415,10 @@ void OctoWS2811::setPixel(uint32_t num, int color)
 		break;
 	}
 	strip = num / stripLen;  // Cortex-M4 has 2 cycle unsigned divide :-)
+    // Note: strips 12-15 don't exist (yet?)
 	offset = num % stripLen;
 	bit = (1<<strip);
-	p = ((uint8_t *)drawBuffer) + offset * 24;
+	p = &((uint16_t *)drawBuffer)[offset * 24];
 	for (mask = (1<<23) ; mask ; mask >>= 1) {
 		if (color & mask) {
 			*p++ |= bit;
@@ -412,13 +431,13 @@ void OctoWS2811::setPixel(uint32_t num, int color)
 int OctoWS2811::getPixel(uint32_t num)
 {
 	uint32_t strip, offset, mask;
-	uint8_t bit, *p;
+	uint16_t bit, *p;
 	int color=0;
 
 	strip = num / stripLen;
 	offset = num % stripLen;
 	bit = (1<<strip);
-	p = ((uint8_t *)drawBuffer) + offset * 24;
+	p = &((uint16_t *)drawBuffer)[offset * 24];
 	for (mask = (1<<23) ; mask ; mask >>= 1) {
 		if (*p++ & bit) color |= mask;
 	}
