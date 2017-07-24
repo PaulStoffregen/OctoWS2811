@@ -447,7 +447,7 @@ void OctoWS2811::setPixel(uint32_t num, int color)
 		break;
 	}
 	strip = num / stripLen;  // Cortex-M4 has 2 cycle unsigned divide :-)
-    // Note: strips 12-15 don't exist (yet?)
+	// Note: strips 12-15 don't exist (yet?)
 	offset = num % stripLen;
 	bit = (1<<strip);
 	p = &((uint16_t *)drawBuffer)[offset * 24];
