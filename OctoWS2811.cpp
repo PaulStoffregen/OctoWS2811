@@ -224,7 +224,6 @@ void OctoWS2811::begin(void)
 	dma2.transferSize(2);
 	dma2.transferCount(bufsize);
 	dma2.disableOnCompletion();
-    dma2.interruptAtCompletion();
 
 	// DMA channel #3 clear all the pins low at 69% of the cycle
 	dma3.source(ones);
