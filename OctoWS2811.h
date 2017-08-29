@@ -24,6 +24,10 @@
 #ifndef OctoWS2811_h
 #define OctoWS2811_h
 
+#ifdef __AVR__
+#error "Sorry, OctoWS2811 only works on 32 bit Teensy boards.  AVR isn't supported."
+#endif
+
 #include <Arduino.h>
 #include "DMAChannel.h"
 
