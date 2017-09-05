@@ -172,8 +172,9 @@ void updatePixels() {
   uint16_t ledOffset = PIXELS_PER_PACKET*currentPacket;
   
  for (uint32_t i=0; i<nrOfPixels; i++) {  
- leds.setPixel(i+ledOffset, Color(packetBuffer[ofs++], packetBuffer[ofs++], packetBuffer[ofs++]));
-  }
+   leds.setPixel(i+ledOffset, Color(packetBuffer[ofs], packetBuffer[ofs+1], packetBuffer[ofs+2]));
+   ofs += 3;
+ }
 
   //update only if all data packets recieved
   if (currentPacket==totalPacket-1) {
@@ -240,7 +241,6 @@ int16_t readCommand() {
 // --------------------------------------------
 void showInitImage() {
 
-  int a =1;
   for (int i = 0 ; i < NUM_LEDS; i++ ) {
     leds.setPixel(i,Color(i*0.2,i*0.5,i*0.5));
   }
@@ -258,5 +258,6 @@ void debugBlink(uint8_t t) {
 unsigned int Color(byte r, byte g, byte b)
 {
   //Take the lowest 8 bits of each value and append them end to end
-return( ((unsigned int)b & 0xFF )<<16 | ((unsigned int)r & 0xFF)<<8 | (unsigned int)g & 0xFF);}
+  return( (((unsigned int)b & 0xFF )<<16) | (((unsigned int)r & 0xFF)<<8) | ((unsigned int)g & 0xFF));
+}
 
