@@ -2,6 +2,10 @@
 //
 // https://forum.pjrc.com/threads/33012-Gladiator-with-OctoWS2811-working-example
 
+// You can also use Jinx to record Glediator format data to a SD card.
+// To play the data from your SD card, use this modified program:
+// https://forum.pjrc.com/threads/46229&viewfull=1#post153927
+
 #include <OctoWS2811.h>
 
 const int ledsPerStrip = 34;
