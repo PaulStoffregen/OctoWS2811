@@ -373,8 +373,7 @@ void OctoWS2811::show(void)
 
 void OctoWS2811::setPixel(uint32_t num, int color)
 {
-	uint32_t strip, offset, mask;
-	uint8_t bit, *p;
+	uint32_t strip, offset, mask32, *p;
 
 	switch (params & 7) {
 	  case WS2811_RBG:
@@ -397,15 +396,34 @@ void OctoWS2811::setPixel(uint32_t num, int color)
 	}
 	strip = num / stripLen;  // Cortex-M4 has 2 cycle unsigned divide :-)
 	offset = num % stripLen;
-	bit = (1<<strip);
-	p = ((uint8_t *)drawBuffer) + offset * 24;
-	for (mask = (1<<23) ; mask ; mask >>= 1) {
-		if (color & mask) {
-			*p++ |= bit;
-		} else {
-			*p++ &= ~bit;
-		}
-	}
+	
+	p = ((uint32_t *) drawBuffer) + offset * 6;
+
+	mask32 = (0x01010101) << strip;
+
+	// Set bytes 0-3
+	*p &= ~mask32;
+	*p |= (((color & 0x800000) >> 23) | ((color & 0x400000) >> 14) | ((color & 0x200000) >> 5) | ((color & 0x100000) << 4)) << strip;   
+
+	// Set bytes 4-7
+	*++p &= ~mask32;
+	*p |= (((color & 0x80000) >> 19) | ((color & 0x40000) >> 10) | ((color & 0x20000) >> 1) | ((color & 0x10000) << 8)) << strip;
+
+	// Set bytes 8-11
+	*++p &= ~mask32;
+	*p |= (((color & 0x8000) >> 15) | ((color & 0x4000) >> 6) | ((color & 0x2000) << 3) | ((color & 0x1000) << 12)) << strip;
+
+	// Set bytes 12-15
+	*++p &= ~mask32;
+	*p |= (((color & 0x800) >> 11) | ((color & 0x400) >> 2) | ((color & 0x200) << 7) | ((color & 0x100) << 16)) << strip;
+
+	// Set bytes 16-19
+	*++p &= ~mask32;
+	*p |= (((color & 0x80) >> 7) | ((color & 0x40) << 2) | ((color & 0x20) << 11) | ((color & 0x10) << 20)) << strip;
+
+	// Set bytes 20-23
+	*++p &= ~mask32;
+	*p |= (((color & 0x8) >> 3) | ((color & 0x4) << 6) | ((color & 0x2) << 15) | ((color & 0x1) << 24)) << strip;
 }
 
 int OctoWS2811::getPixel(uint32_t num)
