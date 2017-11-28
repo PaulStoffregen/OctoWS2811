@@ -285,7 +285,6 @@ void OctoWS2811::show(void)
 #elif defined(__MK20DX256__)
 	FTM2_C0SC = 0x28;
 	FTM2_C1SC = 0x28;
-	delay(1);
 	uint32_t cv = FTM2_C0V;
 	noInterrupts();
 	// CAUTION: this code is timing critical.
@@ -313,7 +312,6 @@ void OctoWS2811::show(void)
 #elif defined(__MK64FX512__) || defined(__MK66FX1M0__)
 	FTM2_C0SC = 0x28;
 	FTM2_C1SC = 0x28;
-	delay(1);
 	uint32_t cv = FTM2_C1V;
 	noInterrupts();
 	// CAUTION: this code is timing critical.
