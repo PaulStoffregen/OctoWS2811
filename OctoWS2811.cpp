@@ -68,6 +68,15 @@ OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
 // Discussion about timing and flicker & color shift issues:
 // http://forum.pjrc.com/threads/23877-WS2812B-compatible-with-OctoWS2811-library?p=38190&viewfull=1#post38190
 
+void OctoWS2811::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config)
+{
+	stripLen = numPerStrip;
+	frameBuffer = frameBuf;
+	drawBuffer = drawBuf;
+	params = config;
+	begin();
+}
+
 void OctoWS2811::begin(void)
 {
 	uint32_t bufsize, frequency;
