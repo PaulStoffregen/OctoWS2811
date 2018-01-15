@@ -11,6 +11,9 @@
 #include <SPI.h>
 #include <OctoWS2811.h>
 
+// Ideas for improving performance with WIZ820io / WIZ850io Ethernet:
+// https://forum.pjrc.com/threads/45760-E1-31-sACN-Ethernet-DMX-Performance-help-6-Universe-Limit-improvements
+
 // OctoWS2811 settings
 const int ledsPerStrip = 492; // change for your setup
 const byte numStrips= 1; // change for your setup
