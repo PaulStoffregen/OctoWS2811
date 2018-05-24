@@ -331,6 +331,9 @@ void OctoWS2811::show(void)
 	FTM2_CNT = 0;
 	update_in_progress = 1;
 	//digitalWriteFast(9, HIGH); // oscilloscope trigger
+	#if defined(__MK64FX512__)
+	asm("nop");
+	#endif
 	PORTA_ISFR = (1<<10);    // clear any prior rising edge
 	uint32_t tmp __attribute__((unused));
 	FTM2_C0SC = 0x28;
