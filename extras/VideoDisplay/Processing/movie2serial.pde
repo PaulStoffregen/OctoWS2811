@@ -1,7 +1,7 @@
 /*  OctoWS2811 movie2serial.pde - Transmit video data to 1 or more
       Teensy 3.0 boards running OctoWS2811 VideoDisplay.ino
     http://www.pjrc.com/teensy/td_libs_OctoWS2811.html
-    Copyright (c) 2013 Paul Stoffregen, PJRC.COM, LLC
+    Copyright (c) 2018 Paul Stoffregen, PJRC.COM, LLC
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -22,6 +22,10 @@
     THE SOFTWARE.
 */
 
+// Linux systems (including Raspberry Pi) require 49-teensy.rules in
+// /etc/udev/rules.d/, and gstreamer compatible with Processing's
+// video library.
+
 // To configure this program, edit the following sections:
 //
 //  1: change myMovie to open a video file of your choice    ;-)
@@ -40,7 +44,7 @@ import processing.video.*;
 import processing.serial.*;
 import java.awt.Rectangle;
 
-Movie myMovie = new Movie(this, "/tmp/Toy_Story.avi");
+Movie myMovie;
 
 float gamma = 1.7;
 
@@ -55,6 +59,10 @@ int[] gammatable = new int[256];
 int errorCount=0;
 float framerate=0;
 
+void settings() {
+  size(480, 400);  // create the window
+}
+
 void setup() {
   String[] list = Serial.list();
   delay(20);
@@ -66,20 +74,21 @@ void setup() {
   for (int i=0; i < 256; i++) {
     gammatable[i] = (int)(pow((float)i / 255.0, gamma) * 255.0 + 0.5);
   }
-  size(480, 400);  // create the window
+  myMovie = new Movie(this, "/tmp/Toy_Story.avi");
   myMovie.loop();  // start the movie :-)
 }
 
- 
+
 // movieEvent runs for each new frame of movie data
 void movieEvent(Movie m) {
+  println("movieEvent");
   // read the movie's next frame
   m.read();
-  
+
   //if (framerate == 0) framerate = m.getSourceFrameRate();
   framerate = 30.0; // TODO, how to read the frame rate???
-  
-  for (int i=0; i < numPorts; i++) {    
+
+  for (int i=0; i < numPorts; i++) {
     // copy a portion of the movie's image to the LED image
     int xoffset = percentage(m.width, ledArea[i].x);
     int yoffset = percentage(m.height, ledArea[i].y);
@@ -101,7 +110,7 @@ void movieEvent(Movie m) {
       ledData[2] = 0;
     }
     // send the raw data to the LEDs  :-)
-    ledSerial[i].write(ledData); 
+    ledSerial[i].write(ledData);
   }
 }
 
@@ -113,7 +122,7 @@ void image2data(PImage image, byte[] data, boolean layout) {
   int x, y, xbegin, xend, xinc, mask;
   int linesPerPin = image.height / 8;
   int pixel[] = new int[8];
-  
+
   for (y = 0; y < linesPerPin; y++) {
     if ((y & 1) == (layout ? 0 : 1)) {
       // even numbered rows are left to right
@@ -141,7 +150,7 @@ void image2data(PImage image, byte[] data, boolean layout) {
         data[offset++] = b;
       }
     }
-  } 
+  }
 }
 
 // translate the 24 bit color from RGB to the actual
@@ -196,9 +205,10 @@ void serialConfigure(String portName) {
 
 // draw runs every time the screen is redrawn - show the movie...
 void draw() {
+  //println("draw");
   // show the original video
   image(myMovie, 0, 80);
-  
+
   // then try to show what was most recently sent to the LEDs
   // by displaying all the images for each port.
   for (int i=0; i < numPorts; i++) {
@@ -210,7 +220,7 @@ void draw() {
     int yloc =  percentage(ysize, ledArea[i].y);
     // show what should appear on the LEDs
     image(ledImage[i], 240 - xsize / 2 + xloc, 10 + yloc);
-  } 
+  }
 }
 
 // respond to mouse clicks as pause/play
@@ -252,4 +262,3 @@ double percentageFloat(int percent) {
   if (percent ==  8) return 1.0 / 12.0;
   return (double)percent / 100.0;
 }
-
