@@ -47,6 +47,10 @@ OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
 	params = config;
 }
 
+OctoWS2811::OctoWS2811()
+{
+}
+
 // Waveform timing: these set the high time for a 0 and 1 bit, as a fraction of
 // the total 800 kHz or 400 kHz clock cycle.  The scale is 0 to 255.  The Worldsemi
 // datasheet seems T1H should be 600 ns of a 1250 ns cycle, or 48%.  That may
