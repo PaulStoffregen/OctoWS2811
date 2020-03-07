@@ -23,9 +23,10 @@
     THE SOFTWARE.
 */
 
-#include <string.h>
+#include <Arduino.h>
 #include "OctoWS2811.h"
 
+#if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__MKL26Z64__)
 
 uint16_t OctoWS2811::stripLen;
 void * OctoWS2811::frameBuffer;
@@ -472,3 +473,5 @@ int OctoWS2811::getPixel(uint32_t num)
 	}
 	return color;
 }
+
+#endif // supported boards

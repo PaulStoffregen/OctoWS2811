@@ -24,19 +24,17 @@
 #ifndef OctoWS2811_h
 #define OctoWS2811_h
 
+#include <Arduino.h>
+
 #ifdef __AVR__
 #error "Sorry, OctoWS2811 only works on 32 bit Teensy boards.  AVR isn't supported."
 #endif
 
-#include <Arduino.h>
-#include "DMAChannel.h"
-
 #if TEENSYDUINO < 121
 #error "Teensyduino version 1.21 or later is required to compile this library."
 #endif
-#ifdef __AVR__
-#error "OctoWS2811 does not work with Teensy 2.0 or Teensy++ 2.0."
-#endif
+
+#include "DMAChannel.h"
 
 #define WS2811_RGB	0	// The WS2811 datasheet documents this way
 #define WS2811_RBG	1
@@ -52,9 +50,16 @@
 
 class OctoWS2811 {
 public:
+#if defined(__IMXRT1062__)
+	// Teensy 4.x can use any arbitrary group of pins!
+	OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
+	void begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
+#else
+	// Teensy 3.x is fixed to 8 pins: 2, 14, 7, 8, 6, 20, 21, 5
 	OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB);
-	void begin(void);
 	void begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB);
+#endif
+	void begin(void);
 
 	void setPixel(uint32_t num, int color);
 	void setPixel(uint32_t num, uint8_t red, uint8_t green, uint8_t blue) {
@@ -80,6 +85,7 @@ private:
 	static uint8_t params;
 	static DMAChannel dma1, dma2, dma3;
 	static void isr(void);
+	static uint8_t defaultPinList[8];
 };
 
 #endif
