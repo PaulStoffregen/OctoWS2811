@@ -85,6 +85,11 @@ void OctoWS2811::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
 	begin();
 }
 
+int OctoWS2811::numPixels(void)
+{
+	return stripLen * numpins;
+}
+
 extern "C" void xbar_connect(unsigned int input, unsigned int output); // in pwm.c
 static volatile uint32_t *standard_gpio_addr(volatile uint32_t *fastgpio) {
 	return (volatile uint32_t *)((uint32_t)fastgpio - 0x01E48000);
