@@ -22,8 +22,13 @@ byte pinList[numPins] = {2, 14, 6, 5};
 
 const int ledsPerStrip = 120;
 
-DMAMEM int displayMemory[ledsPerStrip*6];
-int drawingMemory[ledsPerStrip*6];
+// These buffers need to be large enough for all the pixels.
+// The total number of pixels is "ledsPerStrip * numPins".
+// Each pixel needs 3 bytes, so multiply by 3.  An "int" is
+// 4 bytes, so divide by 4.  The array is created using "int"
+// so the compiler will align it to 32 bit memory.
+DMAMEM int displayMemory[ledsPerStrip * numPins * 3 / 4];
+int drawingMemory[ledsPerStrip * numPins * 3 / 4];
 
 const int config = WS2811_GRB | WS2811_800kHz;
 

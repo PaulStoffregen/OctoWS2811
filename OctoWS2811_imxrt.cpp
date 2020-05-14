@@ -208,7 +208,7 @@ void OctoWS2811::begin(void)
 	dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_XBAR1_2);
 
 	// set up the buffers
-	uint32_t bufsize = stripLen*24;
+	uint32_t bufsize = numbytes * numpins;
 	memset(frameBuffer, 0, bufsize);
 	if (drawBuffer) {
 		memset(drawBuffer, 0, bufsize);
@@ -248,7 +248,7 @@ void OctoWS2811::show(void)
 	// it's ok to copy the drawing buffer to the frame buffer
 	// during the 50us WS2811 reset time
 	if (drawBuffer != frameBuffer) {
-		memcpy(frameBuffer, drawBuffer, stripLen * 24);
+		memcpy(frameBuffer, drawBuffer, numbytes * numpins);
 	}
 
 	// disable timers
