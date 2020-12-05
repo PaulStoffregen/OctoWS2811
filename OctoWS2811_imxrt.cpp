@@ -375,7 +375,7 @@ int OctoWS2811::busy(void)
 
 void OctoWS2811::setPixel(uint32_t num, int color)
 {
-	if (params < 6) {
+	if ((params & 0x1F) < 6) {
 		switch (params & 7) {
 		  case WS2811_RBG:
 			color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
@@ -441,26 +441,62 @@ void OctoWS2811::setPixel(uint32_t num, int color)
 
 int OctoWS2811::getPixel(uint32_t num)
 {
-	const uint8_t *p = (uint8_t *)drawBuffer + num * 3;
-	int color = p[2] | (p[1] << 8) | (p[0] << 16);
-	switch (params & 7) {
-	  case WS2811_RBG:
-		color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
-		break;
-	  case WS2811_GRB:
-		color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
-		break;
-	  case WS2811_GBR:
-		color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
-		break;
-	  case WS2811_BRG:
-		color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
-		break;
-	  case WS2811_BGR:
-		color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
-		break;
-	  default:
-		break;
+	int color = 0;
+
+	if ((params & 0x1F) < 6) {
+		const uint8_t *p = (uint8_t *)drawBuffer + num * 3;
+		color = p[2] | (p[1] << 8) | (p[0] << 16);
+		switch (params & 7) {
+		  case WS2811_RBG:
+			color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
+			break;
+		  case WS2811_GRB:
+			color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
+			break;
+		  case WS2811_GBR:
+			color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
+			break;
+		  case WS2811_BRG:
+			color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
+			break;
+		  case WS2811_BGR:
+			color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
+			break;
+		  default:
+			break;
+		}
+	} else {
+		const uint8_t *p = (uint8_t *)drawBuffer + num * 4;
+		uint8_t r = *p++;
+		uint8_t g = *p++;
+		uint8_t b = *p++;
+		uint8_t w = *p++;
+		switch (params & 0x1F) {
+		  case WS2811_RGBW: color = (r << 16) | (g << 8) | b | (w << 24); break;
+		  case WS2811_RBGW: color = (r << 16) | (b << 8) | g | (w << 24); break;
+		  case WS2811_GRBW: color = (g << 16) | (r << 8) | b | (w << 24); break;
+		  case WS2811_GBRW: color = (g << 16) | (b << 8) | r | (w << 24); break;
+		  case WS2811_BRGW: color = (b << 16) | (r << 8) | g | (w << 24); break;
+		  case WS2811_BGRW: color = (b << 16) | (g << 8) | r | (w << 24); break;
+		  case WS2811_WRGB: color = (w << 16) | (r << 8) | g | (b << 24); break;
+		  case WS2811_WRBG: color = (w << 16) | (r << 8) | b | (g << 24); break;
+		  case WS2811_WGRB: color = (w << 16) | (g << 8) | r | (b << 24); break;
+		  case WS2811_WGBR: color = (w << 16) | (g << 8) | b | (r << 24); break;
+		  case WS2811_WBRG: color = (w << 16) | (b << 8) | r | (g << 24); break;
+		  case WS2811_WBGR: color = (w << 16) | (b << 8) | g | (r << 24); break;
+		  case WS2811_RWGB: color = (r << 16) | (w << 8) | g | (b << 24); break;
+		  case WS2811_RWBG: color = (r << 16) | (w << 8) | b | (g << 24); break;
+		  case WS2811_GWRB: color = (g << 16) | (w << 8) | r | (b << 24); break;
+		  case WS2811_GWBR: color = (g << 16) | (w << 8) | b | (r << 24); break;
+		  case WS2811_BWRG: color = (b << 16) | (w << 8) | r | (g << 24); break;
+		  case WS2811_BWGR: color = (b << 16) | (w << 8) | g | (r << 24); break;
+		  case WS2811_RGWB: color = (r << 16) | (g << 8) | w | (b << 24); break;
+		  case WS2811_RBWG: color = (r << 16) | (b << 8) | w | (g << 24); break;
+		  case WS2811_GRWB: color = (g << 16) | (r << 8) | w | (b << 24); break;
+		  case WS2811_GBWR: color = (g << 16) | (b << 8) | w | (r << 24); break;
+		  case WS2811_BRWG: color = (b << 16) | (r << 8) | w | (g << 24); break;
+		  case WS2811_BGWR: color = (b << 16) | (g << 8) | w | (r << 24); break;
+		}
 	}
 	return color;
 }

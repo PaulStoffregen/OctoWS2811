@@ -266,7 +266,11 @@ void OctoWS2811::show(void)
 	if (drawBuffer != frameBuffer) {
 		// TODO: this could be faster with DMA, especially if the
 		// buffers are 32 bit aligned... but does it matter?
-		memcpy(frameBuffer, drawBuffer, stripLen * 24);
+		if ((params & 0x1F) < 6) {
+			memcpy(frameBuffer, drawBuffer, stripLen * 24);
+		} else {
+			memcpy(frameBuffer, drawBuffer, stripLen * 32);
+		}
 	}
 	// wait for WS2811 reset
 	while (micros() - update_completed_at < 300) ;
@@ -368,7 +372,7 @@ void OctoWS2811::show(void)
 	dma1.clearComplete();
 	dma2.clearComplete();
 	dma3.clearComplete();
-	uint32_t bufsize = stripLen*24;
+	const uint32_t bufsize = stripLen * (((params & 0x1F) < 6) ? 24 : 32);
 	dma1.transferCount(bufsize);
 	dma2.transferCount(bufsize);
 	dma3.transferCount(bufsize);
@@ -392,57 +396,127 @@ void OctoWS2811::show(void)
 
 void OctoWS2811::setPixel(uint32_t num, int color)
 {
-	uint32_t strip, offset, mask32, *p;
+	//Serial.printf("setPixel %u to color %08X\n", num, color);
+	if ((params & 0x1F) < 6) {
+		switch (params & 7) {
+		  case WS2811_RBG:
+			color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
+			break;
+		  case WS2811_GRB:
+			color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
+			break;
+		  case WS2811_GBR:
+			color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
+			break;
+		  case WS2811_BRG:
+			color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
+			break;
+		  case WS2811_BGR:
+			color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
+			break;
+		  default:
+			break;
+		}
+		uint32_t strip = num / stripLen;  // Cortex-M4 has 2 cycle unsigned divide :-)
+		uint32_t offset = num % stripLen;
 
-	switch (params & 7) {
-	  case WS2811_RBG:
-		color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
-		break;
-	  case WS2811_GRB:
-		color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
-		break;
-	  case WS2811_GBR:
-		color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
-		break;
-	  case WS2811_BRG:
-		color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
-		break;
-	  case WS2811_BGR:
-		color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
-		break;
-	  default:
-		break;
+		uint32_t *p = ((uint32_t *) drawBuffer) + offset * 6;
+
+		uint32_t mask32 = (0x01010101) << strip;
+
+		// Set bytes 0-3
+		*p &= ~mask32;
+		*p |= (((color & 0x800000) >> 23) | ((color & 0x400000) >> 14) | ((color & 0x200000) >> 5) | ((color & 0x100000) << 4)) << strip;
+
+		// Set bytes 4-7
+		*++p &= ~mask32;
+		*p |= (((color & 0x80000) >> 19) | ((color & 0x40000) >> 10) | ((color & 0x20000) >> 1) | ((color & 0x10000) << 8)) << strip;
+
+		// Set bytes 8-11
+		*++p &= ~mask32;
+		*p |= (((color & 0x8000) >> 15) | ((color & 0x4000) >> 6) | ((color & 0x2000) << 3) | ((color & 0x1000) << 12)) << strip;
+
+		// Set bytes 12-15
+		*++p &= ~mask32;
+		*p |= (((color & 0x800) >> 11) | ((color & 0x400) >> 2) | ((color & 0x200) << 7) | ((color & 0x100) << 16)) << strip;
+
+		// Set bytes 16-19
+		*++p &= ~mask32;
+		*p |= (((color & 0x80) >> 7) | ((color & 0x40) << 2) | ((color & 0x20) << 11) | ((color & 0x10) << 20)) << strip;
+
+		// Set bytes 20-23
+		*++p &= ~mask32;
+		*p |= (((color & 0x8) >> 3) | ((color & 0x4) << 6) | ((color & 0x2) << 15) | ((color & 0x1) << 24)) << strip;
+	} else {
+		uint8_t b = color;
+		uint8_t g = color >> 8;
+		uint8_t r = color >> 16;
+		uint8_t w = color >> 24;
+		uint32_t c = 0;
+		switch (params & 0x1F) {
+			case WS2811_RGBW: c = (r << 24) | (g << 16) | (b << 8) | w; break;
+			case WS2811_RBGW: c = (r << 24) | (b << 16) | (g << 8) | w; break;
+			case WS2811_GRBW: c = (g << 24) | (r << 16) | (b << 8) | w; break;
+			case WS2811_GBRW: c = (g << 24) | (b << 16) | (r << 8) | w; break;
+			case WS2811_BRGW: c = (b << 24) | (r << 16) | (g << 8) | w; break;
+			case WS2811_BGRW: c = (b << 24) | (b << 16) | (r << 8) | w; break;
+			case WS2811_WRGB: c = (w << 24) | (r << 16) | (g << 8) | b; break;
+			case WS2811_WRBG: c = (w << 24) | (r << 16) | (b << 8) | g; break;
+			case WS2811_WGRB: c = (w << 24) | (g << 16) | (r << 8) | b; break;
+			case WS2811_WGBR: c = (w << 24) | (g << 16) | (b << 8) | r; break;
+			case WS2811_WBRG: c = (w << 24) | (b << 16) | (r << 8) | g; break;
+			case WS2811_WBGR: c = (w << 24) | (b << 16) | (g << 8) | r; break;
+			case WS2811_RWGB: c = (r << 24) | (w << 16) | (g << 8) | b; break;
+			case WS2811_RWBG: c = (r << 24) | (w << 16) | (b << 8) | g; break;
+			case WS2811_GWRB: c = (g << 24) | (w << 16) | (r << 8) | b; break;
+			case WS2811_GWBR: c = (g << 24) | (w << 16) | (b << 8) | r; break;
+			case WS2811_BWRG: c = (b << 24) | (w << 16) | (r << 8) | g; break;
+			case WS2811_BWGR: c = (b << 24) | (w << 16) | (g << 8) | r; break;
+			case WS2811_RGWB: c = (r << 24) | (g << 16) | (w << 8) | b; break;
+			case WS2811_RBWG: c = (r << 24) | (b << 16) | (w << 8) | g; break;
+			case WS2811_GRWB: c = (g << 24) | (r << 16) | (w << 8) | b; break;
+			case WS2811_GBWR: c = (g << 24) | (b << 16) | (w << 8) | r; break;
+			case WS2811_BRWG: c = (b << 24) | (r << 16) | (w << 8) | g; break;
+			case WS2811_BGWR: c = (b << 24) | (g << 16) | (w << 8) | r; break;
+		}
+		uint32_t strip = num / stripLen;
+		uint32_t offset = num % stripLen;
+
+		uint32_t *p = ((uint32_t *) drawBuffer) + offset * 8;
+		uint32_t mask32 = (0x01010101) << strip;
+
+		// Set bytes 0-3
+		*p &= ~mask32;
+		*p |= (((c & 0x80000000) >> 31) | ((c & 0x40000000) >> 22) | ((c & 0x20000000) >> 13) | ((c & 0x10000000) >> 4)) << strip;
+
+		// Set bytes 4-7
+		*++p &= ~mask32;
+		*p |= (((c & 0x8000000) >> 27) | ((c & 0x4000000) >> 18) | ((c & 0x2000000) >> 9) | ((c & 0x1000000) << 0)) << strip;
+
+		// Set bytes 8-11
+		*++p &= ~mask32;
+		*p |= (((c & 0x800000) >> 23) | ((c & 0x400000) >> 14) | ((c & 0x200000) >> 5) | ((c & 0x100000) << 4)) << strip;
+
+		// Set bytes 12-15
+		*++p &= ~mask32;
+		*p |= (((c & 0x80000) >> 19) | ((c & 0x40000) >> 10) | ((c & 0x20000) >> 1) | ((c & 0x10000) << 8)) << strip;
+
+		// Set bytes 16-19
+		*++p &= ~mask32;
+		*p |= (((c & 0x8000) >> 15) | ((c & 0x4000) >> 6) | ((c & 0x2000) << 3) | ((c & 0x1000) << 12)) << strip;
+
+		// Set bytes 20-23
+		*++p &= ~mask32;
+		*p |= (((c & 0x800) >> 11) | ((c & 0x400) >> 2) | ((c & 0x200) << 7) | ((c & 0x100) << 16)) << strip;
+
+		// Set bytes 24-27
+		*++p &= ~mask32;
+		*p |= (((c & 0x80) >> 7) | ((c & 0x40) << 2) | ((c & 0x20) << 11) | ((c & 0x10) << 20)) << strip;
+
+		// Set bytes 28-31
+		*++p &= ~mask32;
+		*p |= (((c & 0x8) >> 3) | ((c & 0x4) << 6) | ((c & 0x2) << 15) | ((c & 0x1) << 24)) << strip;
 	}
-	strip = num / stripLen;  // Cortex-M4 has 2 cycle unsigned divide :-)
-	offset = num % stripLen;
-	
-	p = ((uint32_t *) drawBuffer) + offset * 6;
-
-	mask32 = (0x01010101) << strip;
-
-	// Set bytes 0-3
-	*p &= ~mask32;
-	*p |= (((color & 0x800000) >> 23) | ((color & 0x400000) >> 14) | ((color & 0x200000) >> 5) | ((color & 0x100000) << 4)) << strip;   
-
-	// Set bytes 4-7
-	*++p &= ~mask32;
-	*p |= (((color & 0x80000) >> 19) | ((color & 0x40000) >> 10) | ((color & 0x20000) >> 1) | ((color & 0x10000) << 8)) << strip;
-
-	// Set bytes 8-11
-	*++p &= ~mask32;
-	*p |= (((color & 0x8000) >> 15) | ((color & 0x4000) >> 6) | ((color & 0x2000) << 3) | ((color & 0x1000) << 12)) << strip;
-
-	// Set bytes 12-15
-	*++p &= ~mask32;
-	*p |= (((color & 0x800) >> 11) | ((color & 0x400) >> 2) | ((color & 0x200) << 7) | ((color & 0x100) << 16)) << strip;
-
-	// Set bytes 16-19
-	*++p &= ~mask32;
-	*p |= (((color & 0x80) >> 7) | ((color & 0x40) << 2) | ((color & 0x20) << 11) | ((color & 0x10) << 20)) << strip;
-
-	// Set bytes 20-23
-	*++p &= ~mask32;
-	*p |= (((color & 0x8) >> 3) | ((color & 0x4) << 6) | ((color & 0x2) << 15) | ((color & 0x1) << 24)) << strip;
 }
 
 int OctoWS2811::getPixel(uint32_t num)
@@ -451,6 +525,7 @@ int OctoWS2811::getPixel(uint32_t num)
 	uint8_t bit, *p;
 	int color=0;
 
+	if ((params & 0x1F) >= 6) return 0; // TODO: implement getPixel() for RGBW modes
 	strip = num / stripLen;
 	offset = num % stripLen;
 	bit = (1<<strip);
