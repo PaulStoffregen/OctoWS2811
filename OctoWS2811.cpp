@@ -29,6 +29,7 @@
 #if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__MKL26Z64__)
 
 uint16_t OctoWS2811::stripLen;
+//uint8_t OctoWS2811::brightness = 255;
 void * OctoWS2811::frameBuffer;
 void * OctoWS2811::drawBuffer;
 uint8_t OctoWS2811::params;
@@ -81,7 +82,12 @@ void OctoWS2811::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
 void OctoWS2811::begin(void)
 {
 	uint32_t bufsize, frequency;
-	bufsize = stripLen*24;
+
+	if ((params & 0x1F) < 6) {
+		bufsize = stripLen * 24; // RGB formats
+	} else {
+		bufsize = stripLen * 32; // RGBW formats
+	}
 
 	// set up the buffers
 	memset(frameBuffer, 0, bufsize);
@@ -103,7 +109,7 @@ void OctoWS2811::begin(void)
 	pinMode(5, OUTPUT);	// strip #8
 
 	// create the two waveforms for WS2811 low and high bits
-	switch (params & 0xF0) {
+	switch (params & 0xC0) {
 	case WS2811_400kHz:
 		frequency = 400000;
 		break;

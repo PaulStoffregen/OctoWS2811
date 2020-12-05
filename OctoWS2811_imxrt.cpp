@@ -39,6 +39,7 @@
 
 uint8_t OctoWS2811::defaultPinList[8] = {2, 14, 7, 8, 6, 20, 21, 5};
 uint16_t OctoWS2811::stripLen;
+//uint8_t OctoWS2811::brightness = 255;
 void * OctoWS2811::frameBuffer;
 void * OctoWS2811::drawBuffer;
 uint8_t OctoWS2811::params;
@@ -97,7 +98,11 @@ static volatile uint32_t *standard_gpio_addr(volatile uint32_t *fastgpio) {
 
 void OctoWS2811::begin(void)
 {
-	numbytes = stripLen * 3; // TODO: 4 if RGBW
+	if ((params & 0x1F) < 6) {
+		numbytes = stripLen * 3; // RGB formats
+	} else {
+		numbytes = stripLen * 4; // RGBW formats
+	}
 
 	// configure which pins to use
 	memset(bitmask, 0, sizeof(bitmask));
@@ -120,7 +125,7 @@ void OctoWS2811::begin(void)
 	comp1load[0] = (uint16_t)((float)F_BUS_ACTUAL * (float)TH_TL);
 	comp1load[1] = (uint16_t)((float)F_BUS_ACTUAL * (float)T0H);
 	comp1load[2] = (uint16_t)((float)F_BUS_ACTUAL * (float)T1H);
-	if ((params & 0xF0) == WS2811_400kHz) {
+	if ((params & 0xC0) == WS2811_400kHz) {
 		comp1load[0] *= 2;
 		comp1load[1] *= 2;
 		comp1load[2] *= 2;
@@ -370,29 +375,68 @@ int OctoWS2811::busy(void)
 
 void OctoWS2811::setPixel(uint32_t num, int color)
 {
-	switch (params & 7) {
-	  case WS2811_RBG:
-		color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
-		break;
-	  case WS2811_GRB:
-		color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
-		break;
-	  case WS2811_GBR:
-		color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
-		break;
-	  case WS2811_BRG:
-		color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
-		break;
-	  case WS2811_BGR:
-		color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
-		break;
-	  default:
-		break;
+	if (params < 6) {
+		switch (params & 7) {
+		  case WS2811_RBG:
+			color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
+			break;
+		  case WS2811_GRB:
+			color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
+			break;
+		  case WS2811_GBR:
+			color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
+			break;
+		  case WS2811_BRG:
+			color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
+			break;
+		  case WS2811_BGR:
+			color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
+			break;
+		  default:
+			break;
+		}
+		uint8_t *dest = (uint8_t *)drawBuffer + num * 3;
+		*dest++ = color >> 16;
+		*dest++ = color >> 8;
+		*dest++ = color;
+	} else {
+		uint8_t b = color;
+		uint8_t g = color >> 8;
+		uint8_t r = color >> 16;
+		uint8_t w = color >> 24;
+		uint32_t c = 0;
+		switch (params & 0x1F) {
+		  case WS2811_RGBW: c = (r << 24) | (g << 16) | (b << 8) | w; break;
+		  case WS2811_RBGW: c = (r << 24) | (b << 16) | (g << 8) | w; break;
+		  case WS2811_GRBW: c = (g << 24) | (r << 16) | (b << 8) | w; break;
+		  case WS2811_GBRW: c = (g << 24) | (b << 16) | (r << 8) | w; break;
+		  case WS2811_BRGW: c = (b << 24) | (r << 16) | (g << 8) | w; break;
+		  case WS2811_BGRW: c = (b << 24) | (b << 16) | (r << 8) | w; break;
+		  case WS2811_WRGB: c = (w << 24) | (r << 16) | (g << 8) | b; break;
+		  case WS2811_WRBG: c = (w << 24) | (r << 16) | (b << 8) | g; break;
+		  case WS2811_WGRB: c = (w << 24) | (g << 16) | (r << 8) | b; break;
+		  case WS2811_WGBR: c = (w << 24) | (g << 16) | (b << 8) | r; break;
+		  case WS2811_WBRG: c = (w << 24) | (b << 16) | (r << 8) | g; break;
+		  case WS2811_WBGR: c = (w << 24) | (b << 16) | (g << 8) | r; break;
+		  case WS2811_RWGB: c = (r << 24) | (w << 16) | (g << 8) | b; break;
+		  case WS2811_RWBG: c = (r << 24) | (w << 16) | (b << 8) | g; break;
+		  case WS2811_GWRB: c = (g << 24) | (w << 16) | (r << 8) | b; break;
+		  case WS2811_GWBR: c = (g << 24) | (w << 16) | (b << 8) | r; break;
+		  case WS2811_BWRG: c = (b << 24) | (w << 16) | (r << 8) | g; break;
+		  case WS2811_BWGR: c = (b << 24) | (w << 16) | (g << 8) | r; break;
+		  case WS2811_RGWB: c = (r << 24) | (g << 16) | (w << 8) | b; break;
+		  case WS2811_RBWG: c = (r << 24) | (b << 16) | (w << 8) | g; break;
+		  case WS2811_GRWB: c = (g << 24) | (r << 16) | (w << 8) | b; break;
+		  case WS2811_GBWR: c = (g << 24) | (b << 16) | (w << 8) | r; break;
+		  case WS2811_BRWG: c = (b << 24) | (r << 16) | (w << 8) | g; break;
+		  case WS2811_BGWR: c = (b << 24) | (g << 16) | (w << 8) | r; break;
+		}
+		uint8_t *dest = (uint8_t *)drawBuffer + num * 4;
+		*dest++ = c >> 24;
+		*dest++ = c >> 16;
+		*dest++ = c >> 8;
+		*dest++ = c;
 	}
-	uint8_t *dest = (uint8_t *)drawBuffer + num * 3;
-	*dest++ = color >> 16;
-	*dest++ = color >> 8;
-	*dest++ = color;
 }
 
 int OctoWS2811::getPixel(uint32_t num)
