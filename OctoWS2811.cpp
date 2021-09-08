@@ -525,33 +525,113 @@ int OctoWS2811::getPixel(uint32_t num)
 	uint8_t bit, *p;
 	int color=0;
 
-	if ((params & 0x1F) >= 6) return 0; // TODO: implement getPixel() for RGBW modes
 	strip = num / stripLen;
 	offset = num % stripLen;
 	bit = (1<<strip);
-	p = ((uint8_t *)drawBuffer) + offset * 24;
-	for (mask = (1<<23) ; mask ; mask >>= 1) {
-		if (*p++ & bit) color |= mask;
+	if ((params & 0x1F) < 6) {
+		p = ((uint8_t *)drawBuffer) + offset * 24;
+		for (mask = (1<<23) ; mask ; mask >>= 1) {
+			if (*p++ & bit) color |= mask;
+		}
+		switch (params & 7) {
+			case WS2811_RBG:
+				color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
+				break;
+			case WS2811_GRB:
+				color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
+				break;
+			case WS2811_GBR:
+				color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
+				break;
+			case WS2811_BRG:
+				color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
+				break;
+			case WS2811_BGR:
+				color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
+				break;
+			default:
+				break;
+		}
+	} else {
+		p = ((uint8_t *)drawBuffer) + offset * 32;
+		for (mask = (1<<31) ; mask ; mask >>= 1) {
+			if (*p++ & bit) color |= mask;
+		}
+		switch (params & 0x1F) {
+			case WS2811_RGBW:
+				color = ((color<<24)&0xFF000000) | ((color>>8)&0x00FF0000) | ((color>>8)&0x0000FF00) | ((color>>8)&0x000000FF);
+				break;
+			case WS2811_RBGW:
+				color = ((color<<24)&0xFF000000) | ((color>>8)&0x00FF0000) | (color&0x0000FF00) | ((color>>16)&0x000000FF);
+				break;
+			case WS2811_GRBW:
+				color = ((color<<24)&0xFF000000) | (color&0x00FF0000) | ((color>>16)&0x0000FF00) | ((color>>8)&0x000000FF);
+				break;
+			case WS2811_GBRW:
+				color = ((color<<24)&0xFF000000) | ((color<<8)&0x00FF0000) | ((color>>16)&0x0000FF00) | ((color>>16)&0x000000FF);
+				break;
+			case WS2811_BRGW:
+				color = ((color<<24)&0xFF000000) | (color&0x00FF0000) | ((color&0x0000FF00) | ((color>>24)&0x000000FF);
+				break;
+			case WS2811_BGRW:
+				color = ((color<<24)&0xFF000000) | ((color<<8)&0x00FF0000) | ((color>>8)&0x0000FF00) | ((color>>24)&0x000000FF);
+				break;
+			case WS2811_WRBG:
+				color = (color&0xFF000000) | (color&0x00FF0000) | ((color<<8)&0x0000FF00) | ((color>>8)&0x000000FF);
+				break;
+			case WS2811_WGRB:
+				color = (color&0xFF000000) | ((color<<8)&0x00FF0000) | ((color>>8)&0x0000FF00) | (color&0x000000FF);
+				break;
+			case WS2811_WGBR:
+				color = (color&0xFF000000) | ((color<<16)&0x00FF0000) | ((color>>8)&0x0000FF00) | ((color>>8)&0x000000FF);
+				break;
+			case WS2811_WBRG:
+				color = (color&0xFF000000) | ((color<<8)&0x00FF0000) | ((color<<8)&0x0000FF00) | ((color>>16)&0x000000FF);
+				break;
+			case WS2811_WBGR:
+				color = (color&0xFF000000) | ((color<<16)&0x00FF0000) | (color&0x0000FF00) | ((color>>16)&0x000000FF);
+				break;
+			case WS2811_RWGB:
+				color = ((color<<8)&0xFF000000) | ((color>>8)&0x00FF0000) | (color&0x0000FF00) | (color&0x000000FF);
+				break;
+			case WS2811_RWBG:
+				color = ((color<<8)&0xFF000000) | ((color>>8)&0x00FF0000) | ((color<<8)&0x0000FF00) | ((color>>8)&0x000000FF);
+				break;
+			case WS2811_GWRB:
+				color = ((color<<8)&0xFF000000) | ((color<<8)&0x00FF0000) | ((color>>16)&0x0000FF00) | (color&0x000000FF);
+				break;
+			case WS2811_GWBR:
+				color = ((color<<8)&0xFF000000) | ((color<<16)&0x00FF0000) | ((color>>16)&0x0000FF00) | ((color>>8)&0x000000FF);
+				break;
+			case WS2811_BWRG:
+				color = ((color<<8)&0xFF000000) | ((color<<8)&0x00FF0000) | ((color<<8)&0x0000FF00) | ((color>>24)&0x000000FF);
+				break;
+			case WS2811_BWGR:
+				color = ((color<<8)&0xFF000000) | ((color<<16)&0x00FF0000) | (color&0x0000FF00) | ((color>>24)&0x000000FF);
+				break;
+			case WS2811_RGWB:
+				color = ((color<<16)&0xFF000000) | ((color>>8)&0x00FF0000) | ((color>>8)&0x0000FF00) | (color&0x000000FF);
+				break;
+			case WS2811_RBWG:
+				color = ((color<<16)&0xFF000000) | ((color>>8)&0x00FF0000) | ((color<<8)&0x0000FF00) | ((color>>16)&0x000000FF);
+				break;
+			case WS2811_GRWB:
+				color = ((color<<16)&0xFF000000) | (color&0x00FF0000) | ((color>>16)&0x0000FF00) | (color&0x000000FF);
+				break;
+			case WS2811_GBWR:
+				color = ((color<<16)&0xFF000000) | ((color<<16)&0x00FF0000) | ((color>>16)&0x0000FF00) | ((color>>16)&0x000000FF);
+				break;
+			case WS2811_BRWG:
+				color = ((color<<16)&0xFF000000) | (color&0x00FF0000) | ((color<<8)&0x0000FF00) | ((color>>24)&0x000000FF);
+				break;
+			case WS2811_BGWR:
+				color = ((color<<16)&0xFF000000) | ((color<<16)&0x00FF0000) | ((color>>8)&0x0000FF00) | ((color>>24)&0x000000FF);
+				break;
+			default:
+				break;
+		}
 	}
-	switch (params & 7) {
-	  case WS2811_RBG:
-		color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
-		break;
-	  case WS2811_GRB:
-		color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
-		break;
-	  case WS2811_GBR:
-		color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
-		break;
-	  case WS2811_BRG:
-		color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
-		break;
-	  case WS2811_BGR:
-		color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
-		break;
-	  default:
-		break;
-	}
+
 	return color;
 }
 
