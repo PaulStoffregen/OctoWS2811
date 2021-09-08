@@ -571,7 +571,7 @@ int OctoWS2811::getPixel(uint32_t num)
 				color = ((color<<24)&0xFF000000) | ((color<<8)&0x00FF0000) | ((color>>16)&0x0000FF00) | ((color>>16)&0x000000FF);
 				break;
 			case WS2811_BRGW:
-				color = ((color<<24)&0xFF000000) | (color&0x00FF0000) | ((color&0x0000FF00) | ((color>>24)&0x000000FF);
+				color = ((color<<24)&0xFF000000) | (color&0x00FF0000) | (color&0x0000FF00) | ((color>>24)&0x000000FF);
 				break;
 			case WS2811_BGRW:
 				color = ((color<<24)&0xFF000000) | ((color<<8)&0x00FF0000) | ((color>>8)&0x0000FF00) | ((color>>24)&0x000000FF);
