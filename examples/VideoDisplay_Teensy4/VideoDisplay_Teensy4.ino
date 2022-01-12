@@ -179,8 +179,9 @@ void loop() {
     unsigned int usecUntilFrameSync = 0;
     int count = Serial.readBytes((char *)&usecUntilFrameSync, 2);
     if (count != 2) return;
-    count = Serial.readBytes((char *)drawingMemory, sizeof(drawingMemory));
-    if (count == sizeof(drawingMemory)) {
+    count = Serial.readBytes((char *)incomingMemory, sizeof(incomingMemory));
+    if (count == sizeof(incomingMemory)) {
+      copyIncomingToDrawing();
       digitalWrite(12, HIGH);
       pinMode(12, OUTPUT);
       while (elapsedUsecSinceLastFrameSync < usecUntilFrameSync) /* wait */ ;
@@ -198,8 +199,9 @@ void loop() {
     unsigned int unusedField = 0;
     int count = Serial.readBytes((char *)&unusedField, 2);
     if (count != 2) return;
-    count = Serial.readBytes((char *)drawingMemory, sizeof(drawingMemory));
-    if (count == sizeof(drawingMemory)) {
+    count = Serial.readBytes((char *)incomingMemory, sizeof(incomingMemory));
+    if (count == sizeof(incomingMemory)) {
+      copyIncomingToDrawing();
       elapsedMillis wait = 0;
       while (digitalRead(12) != HIGH && wait < 30) ; // wait for sync high
       while (digitalRead(12) != LOW && wait < 30) ;  // wait for sync high->low
