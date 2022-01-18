@@ -314,7 +314,8 @@ void OctoWS2811::show(void)
 	TMR4_CNTR2 = comp1load[0] + 1;
 
 	// wait for WS2812 reset
-	while (micros() - update_begin_micros < numbytes * 10 + 300) ;
+	uint32_t us_per_byte = (params & 0xC0) == WS2811_400kHz ? 20 : 10;
+	while (micros() - update_begin_micros < numbytes * us_per_bytes + 300) ;
 
 	// start everything running!
 	TMR4_ENBL = enable | 7;
@@ -364,7 +365,8 @@ void OctoWS2811::isr(void)
 int OctoWS2811::busy(void)
 {
 	if (!dma3.complete()) ; // DMA still running
-	if (micros() - update_begin_micros < numbytes * 10 + 300) return 1; // WS2812 reset
+	uint32_t us_per_byte = (params & 0xC0) == WS2811_400kHz ? 20 : 10;
+	if (micros() - update_begin_micros < numbytes * us_per_byte + 300) return 1; // WS2812 reset
 	return 0;
 }
 
