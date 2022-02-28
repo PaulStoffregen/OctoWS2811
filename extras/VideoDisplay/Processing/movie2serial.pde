@@ -199,7 +199,7 @@ void serialConfigure(String portName) {
   ledImage[numPorts] = new PImage(Integer.parseInt(param[0]), Integer.parseInt(param[1]), RGB);
   ledArea[numPorts] = new Rectangle(Integer.parseInt(param[5]), Integer.parseInt(param[6]),
                      Integer.parseInt(param[7]), Integer.parseInt(param[8]));
-  ledLayout[numPorts] = (Integer.parseInt(param[5]) == 0);
+  ledLayout[numPorts] = (Integer.parseInt(param[2]) == 0);
   numPorts++;
 }
 
