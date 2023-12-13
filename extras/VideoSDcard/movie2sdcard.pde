@@ -46,7 +46,8 @@ boolean ledLayout = true;    // layout of rows, true = even is left->right
 double framerate = 23.98;    // You MUST set this to the movie's frame rate
                              // Processing does not seem to have a way to detect it.
 
-Movie myMovie = new Movie(this, "/Users/paul/myvideo.mov");
+// Movie should be defined here, but initialized in setup()
+Movie myMovie;
 FileOutputStream myFile;     // edit output filename below...
 
 float gamma = 1.8;
@@ -58,6 +59,9 @@ long picoseconds_per_frame = (long)(1e12 / framerate + 0.5);
 boolean fileopen=true;
 
 void setup() {
+  // init myMovie
+  myMovie = new Movie(this, "/Users/paul/myvideo.mov");
+
   for (int i=0; i < 256; i++) {
     gammatable[i] = (int)(pow((float)i / 255.0, gamma) * 255.0 + 0.5);
   }
